@@ -1,7 +1,6 @@
 #pragma once
 #include "Skeleton.h"
 #include <assimp/scene.h>
-#include "PVRAssets/Model.h"
 
 struct MeshData
 {
@@ -51,6 +50,7 @@ typedef shared_ptr<MeshData> MeshDataPtr;
 typedef shared_ptr<TextureData> TextureDataPtr;
 typedef shared_ptr<MaterialData> MaterialDataPtr;
 typedef shared_ptr<ModelData> ModelDataPtr;
+typedef unsigned short uint16;
 
 class ModelLoader
 {
@@ -73,7 +73,7 @@ public:
 	string& getFileNmae() { return m_fileName; }
 	const Skeleton* getSkeleton() { return m_skeleton; }
 
-	vector<uint> geIndexBuffer() { return m_indices; }
+	vector<uint16> geIndexBuffer() { return m_indices; }
 	vector<vec3> getPositionBuffer() { return m_positions; }
 	vector<vec3> getNormalBuffer() { return m_normals; }
 	vector<vec3> getTangetBuffer() { return m_tangents; }
@@ -125,7 +125,7 @@ private:
 	vector<vec2> m_texCoords;
 	vector<vec3> m_normals;
 	vector<vec3> m_tangents;
-	vector<uint> m_indices;
+	vector<uint16> m_indices;
 
 	/*
 	*	Members Variables

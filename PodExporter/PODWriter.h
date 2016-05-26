@@ -30,11 +30,12 @@ public:
 private:
 	bool writeStartTag(uint32 identifier, uint32 dataLength);
 	bool writeEndTag(uint32 identifier);
+
 	void writeSceneBlock();
-	void writeMaterialBlock();
-	void writeMeshBlock();
-	void writeNodeBlock();
-	void writeTextureBlock();
+	void writeMaterialBlock(uint index);
+	void writeMeshBlock(uint index);
+	void writeNodeBlock(uint index);
+	void writeTextureBlock(uint index);
 
 	ModelLoader m_modelLoader;
 	vector<ModelDataPtr> m_modelDataVec;

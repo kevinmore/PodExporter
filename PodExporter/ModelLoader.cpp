@@ -254,9 +254,9 @@ void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh
 		}
 		else
 		{
-			m_indices.push_back(face.mIndices[0]);
-			m_indices.push_back(face.mIndices[1]);
-			m_indices.push_back(face.mIndices[2]);
+			m_indices.push_back((uint16)face.mIndices[0]);
+			m_indices.push_back((uint16)face.mIndices[1]);
+			m_indices.push_back((uint16)face.mIndices[2]);
 		}
 	}
 }
@@ -337,10 +337,11 @@ MeshData ModelLoader::loadMesh(unsigned int index, unsigned int numVertices, uns
 {
 	MeshData data;
 
-	data.name = mesh->mName.length > 0
-		? m_fileName + "/mesh_" + mesh->mName.C_Str()
-		: m_fileName + "/mesh_" + (char)index;
+// 	data.name = mesh->mName.length > 0
+// 		? m_fileName + "/mesh_" + mesh->mName.C_Str()
+// 		: m_fileName + "/mesh_" + (char)index;
 
+	data.name = getMeshNameFromNode(index, m_aiScene->mRootNode);
 	data.numVertices = mesh->mNumVertices;
 	data.numFaces = mesh->mNumFaces;
 	data.numIndices = mesh->mNumFaces * 3;
@@ -492,7 +493,11 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 		{
 			if (strlen(path.data) == 0) continue;
 
-			string texturePath = directory + "/" + path.data;
+			// absolute path
+			//string texturePath = directory + "/" + path.data;
+
+			// relative path
+			string texturePath = path.data;
 
 			if (type == aiTextureType_DIFFUSE)
 			{
