@@ -4,7 +4,7 @@
 
 struct VertexBoneData
 {
-	uint IDs[NUM_BONES_PER_VEREX];
+	uint8_t IDs[NUM_BONES_PER_VEREX];
 	float Weights[NUM_BONES_PER_VEREX];
 
 	VertexBoneData()

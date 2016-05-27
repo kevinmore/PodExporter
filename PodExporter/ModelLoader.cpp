@@ -11,6 +11,7 @@ void ModelLoader::clear()
 	m_tangents.clear();
 	m_indices.clear();
 	m_Bones.clear();
+	m_Nodes.clear();
 }
 
 ModelLoader::ModelLoader()
@@ -47,8 +48,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	}
 
 	// count nodes
-	m_NumNodes = 0;
-	countChildren(m_aiScene->mRootNode);
+	parseNodes(m_aiScene->mRootNode);
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation.Inverse();
 
@@ -75,8 +75,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	m_NumBones = 0;
 	vector<ModelDataPtr> modelDataVector;
 	modelDataVector.resize(m_aiScene->mNumMeshes);
-
-	aiNode* node = m_aiScene->mRootNode->mChildren[1]->mChildren[0];
 
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
 	{
@@ -519,14 +517,14 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	return data;
 }
 
-void ModelLoader::countChildren(aiNode* pNode)
+void ModelLoader::parseNodes(aiNode* pNode)
 {
 	if (!pNode) return;
 
-	++m_NumNodes;
+	m_Nodes.push_back(pNode);
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
-		countChildren(pNode->mChildren[i]);
+		parseNodes(pNode->mChildren[i]);
 	}
 }

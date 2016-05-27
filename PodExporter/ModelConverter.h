@@ -13,10 +13,7 @@ namespace VEEMEE
 
 			return instance;
 		}
-	private:
-		ModelConverter() {};
 
-	public:
 		ModelConverter(ModelConverter const&) = delete;
 		void operator=(ModelConverter const&) = delete;
 
@@ -24,6 +21,7 @@ namespace VEEMEE
 		{
 			ModelLoader loader;
 			vector<ModelDataPtr> models = loader.loadModel(fileName);
+			m_aiScene = loader.getScene();
 
 			pvr::assets::assetWriters::PODWriter exporter(loader);
 			exporter.setModels(models);
@@ -37,5 +35,11 @@ namespace VEEMEE
 
 			exporter.exportModel(nameWithoutExtension + ".pod");
 		}
+
+	private:
+		ModelConverter() {};
+		const aiScene* m_aiScene;
+
 	};
+
 }

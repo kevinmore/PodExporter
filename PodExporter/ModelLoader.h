@@ -72,7 +72,7 @@ public:
 	vector<ModelDataPtr> loadModel(const string& filename, LoadingQuality flag = MAX_QUALITY);
 	string& getFileNmae() { return m_fileName; }
 	const Skeleton* getSkeleton() { return m_skeleton; }
-
+	const aiScene* getScene() { return m_aiScene; }
 	vector<uint16> geIndexBuffer() { return m_indices; }
 	vector<vec3> getPositionBuffer() { return m_positions; }
 	vector<vec3> getNormalBuffer() { return m_normals; }
@@ -80,8 +80,8 @@ public:
 	vector<vec2> getUVBuffer() { return m_texCoords; }
 	vector<VertexBoneData> getBoneBuffer() { return m_Bones; }
 	vector<Bone> getBoneList() { return m_BoneInfo; }
-
-	uint getNumNodes() { return m_NumNodes;  }
+	vector<aiNode*>& getNodeList() { return m_Nodes; }
+	uint getNumNodes() { return m_Nodes.size();  }
 	double getAnimationDuration() { return m_animationDuration; }
 
 private:
@@ -96,7 +96,7 @@ private:
 	void generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 
-	void countChildren(aiNode* pNode);
+	void parseNodes(aiNode* pNode);
 
 	/*
 	*	Clean up
@@ -134,9 +134,9 @@ private:
 	const aiScene* m_aiScene;
 	Skeleton* m_skeleton;
 	map<string, uint> m_BoneMapping; // maps a bone name to its index
+	vector<aiNode*> m_Nodes;
 	vector<VertexBoneData> m_Bones;
 	uint m_NumBones;
-	uint m_NumNodes;
 	vector<Bone> m_BoneInfo;
 	mat4 m_GlobalInverseTransform;
 	double m_animationDuration;

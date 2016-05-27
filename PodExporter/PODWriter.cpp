@@ -15,6 +15,7 @@ template <typename T>
 bool writeBytes(Stream& stream, T& data)
 {
 	uint dataWritten;
+	uint sizez = sizeof(T);
 	return stream.write(sizeof(T), 1, &data, dataWritten);
 }
 
@@ -177,6 +178,15 @@ bool writeVertexData(Stream& stream, DataType::Enum type, uint32 numComponents, 
 	return result;
 }
 
+template <typename T>
+void addByteIntoVector(T& data, vector<byte>& targetVector)
+{
+	byte *temp;
+	temp = reinterpret_cast<byte*>(&data);
+	for (uint i = 0; i < sizeof(T); ++i)
+		targetVector.push_back(temp[i]);
+}
+
 }
 
 namespace pvr {
@@ -186,6 +196,7 @@ namespace assetWriters {
 
 PODWriter::PODWriter(ModelLoader& loader)
 	: m_modelLoader(loader)
+	, m_Nodes(loader.getNodeList())
 {
 }
 
@@ -377,11 +388,7 @@ void PODWriter::writeSceneBlock()
 		writeMaterialBlock(i);
 	}
 
-	// Mesh Block
-	for (uint i = 0; i < m_modelDataVec.size(); ++i)
-	{
-		writeMeshBlock(i);
-	}
+
 
 	// Node Block
 	for (uint32 i = 0; i < numNodes; ++i)
@@ -393,6 +400,12 @@ void PODWriter::writeSceneBlock()
 	for (uint32 i = 0; i < numTextures; ++i)
 	{
 		writeTextureBlock(i);
+	}
+
+	// Mesh Block
+	for (uint i = 0; i < m_modelDataVec.size(); ++i)
+	{
+		writeMeshBlock(i);
 	}
 }
 
@@ -499,74 +512,103 @@ void PODWriter::writeMeshBlock(uint index)
 	write4Bytes(*m_assetStream, (uint32)meshData.numFaces);
 	writeEndTag(pod::e_meshNumFaces);
 
-	// Interleaved Data List
-	//writeStartTag(pod::e_meshInterleavedDataList, 400);
-	//writeEndTag(pod::e_meshInterleavedDataList);
+
 
 	// Vertex Index List
-	vector<uint16> entireIndexBuffer = m_modelLoader.geIndexBuffer();
-	vector<uint16> currentIndexBuffer;
-	for (uint i = meshData.baseIndex; i < meshData.baseIndex + meshData.numIndices; ++i)
-	{
-		currentIndexBuffer.push_back(entireIndexBuffer[i]);
-	}
-	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * currentIndexBuffer.size());
-	writeVertexIndexData<uint16>(*m_assetStream, currentIndexBuffer);
-	writeEndTag(pod::e_meshVertexIndexList);
+// 	vector<uint16> entireIndexBuffer = m_modelLoader.geIndexBuffer();
+// 	vector<uint16> currentIndexBuffer;
+// 	for (uint i = meshData.baseIndex; i < meshData.baseIndex + meshData.numIndices; ++i)
+// 	{
+// 		currentIndexBuffer.push_back(entireIndexBuffer[i]);
+// 	}
+// 	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * currentIndexBuffer.size());
+// 	writeVertexIndexData<uint16>(*m_assetStream, currentIndexBuffer);
+// 	writeEndTag(pod::e_meshVertexIndexList);
 
 	// Vertex List (Position)
-	vector<vec3> entirePositionBuffer = m_modelLoader.getPositionBuffer();
-	vector<vec3> currentPositionBuffer;
-	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
-	{
-		currentPositionBuffer.push_back(entirePositionBuffer[i]);
-	}
-	writeStartTag(pod::e_meshVertexList, sizeof(vec3) * currentPositionBuffer.size());
-	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentPositionBuffer);
-	writeEndTag(pod::e_meshVertexList);
+	vector<vec3> positionBuffer = m_modelLoader.getPositionBuffer();
 
 	// Normal List
-	vector<vec3> entireNormalBuffer = m_modelLoader.getNormalBuffer();
-	vector<vec3> currentNormalBuffer;
-	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
-	{
-		currentNormalBuffer.push_back(entireNormalBuffer[i]);
-	}
-	writeStartTag(pod::e_meshNormalList, sizeof(vec3) * currentNormalBuffer.size());
-	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentNormalBuffer);
-	writeEndTag(pod::e_meshNormalList);
-
-	// Tangent List
-	vector<vec3> entireTangentBuffer = m_modelLoader.getTangetBuffer();
-	vector<vec3> currentTengentBuffer;
-	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
-	{
-		currentTengentBuffer.push_back(entireTangentBuffer[i]);
-	}
-	writeStartTag(pod::e_meshTangentList, sizeof(vec3) * currentTengentBuffer.size());
-	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentTengentBuffer);
-	writeEndTag(pod::e_meshTangentList);
+	vector<vec3> normalBuffer = m_modelLoader.getNormalBuffer();
 
 	// UVW List
-	vector<vec2> entireUVBuffer = m_modelLoader.getUVBuffer();
-	vector<vec2> currentUVBuffer;
-	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
-	{
-		currentUVBuffer.push_back(entireUVBuffer[i]);
-	}
-	writeStartTag(pod::e_meshUVWList, sizeof(vec2) * currentUVBuffer.size());
-	writeVertexData<vec2>(*m_assetStream, DataType::Float32, 2, currentUVBuffer);
-	writeEndTag(pod::e_meshUVWList);
+	vector<vec2> uvBuffer = m_modelLoader.getUVBuffer();
+
+	// Bone Weights List
+	vector<VertexBoneData> boneBuffer = m_modelLoader.getBoneBuffer();
+
+	// Interleaved Data List
+	// Structure: position.xyz + normal.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 52 bytes)
+	uint32 stride = sizeof(positionBuffer[0]) +sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
+	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
+ 	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
+ 	{
+ 		writeBytes(*m_assetStream, positionBuffer[i]);
+ 		writeBytes(*m_assetStream, normalBuffer[i]);
+ 		writeBytes(*m_assetStream, uvBuffer[i]);
+ 		writeBytes(*m_assetStream, boneBuffer[i].Weights);
+ 		writeBytes(*m_assetStream, boneBuffer[i].IDs);
+ 	}
+	writeEndTag(pod::e_meshInterleavedDataList);
+
+// 	writeStartTag(pod::e_meshVertexList, sizeof(vec3) * currentPositionBuffer.size());
+// 	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentPositionBuffer);
+// 	writeEndTag(pod::e_meshVertexList);
+// 	writeStartTag(pod::e_meshNormalList, sizeof(vec3) * currentNormalBuffer.size());
+// 	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentNormalBuffer);
+// 	writeEndTag(pod::e_meshNormalList);
+// 
+// 	writeStartTag(pod::e_meshUVWList, sizeof(vec2) * currentUVBuffer.size());
+// 	writeVertexData<vec2>(*m_assetStream, DataType::Float32, 2, currentUVBuffer);
+// 	writeEndTag(pod::e_meshUVWList);
 
 	writeEndTag(pod::e_sceneMesh);
 }
 
 void PODWriter::writeNodeBlock(uint index)
 {
+	aiNode* node = m_Nodes[index];
+
+
 	// write node block
 	// a block that contains only further nested blocks between its Start and End tags 
 	// will have a Length of zero. 
 	writeStartTag(pod::e_sceneNode, 0);
+
+	// Node Index
+	writeStartTag(pod::e_nodeIndex, 4);
+	writeEndTag(pod::e_nodeIndex);
+
+	// Node Name
+	//StringHash name(matData.name);
+	//writeStartTag(pod::e_nodeName, name.length());
+	//writeByteArrayFromeStringHash(*m_assetStream, name);
+	//writeEndTag(pod::e_nodeName);
+
+	// Material Index (if the node is a mesh)
+	writeStartTag(pod::e_nodeMaterialIndex, 4);
+	writeEndTag(pod::e_nodeMaterialIndex);
+
+	// Parent Index 
+	writeStartTag(pod::e_nodeParentIndex, 4);
+	writeEndTag(pod::e_nodeParentIndex);
+
+	// Animation Flag
+	writeStartTag(pod::e_nodeAnimationFlags, 4);
+	writeEndTag(pod::e_nodeAnimationFlags);
+
+	// Animation Position, 3 floats per frame of animation
+	writeStartTag(pod::e_nodeAnimationPosition, 4 * 3);
+	writeEndTag(pod::e_nodeAnimationPosition);
+
+	// Animation Rotation, 4 floats per frame of animation
+	writeStartTag(pod::e_nodeAnimationRotation, 4 * 4);
+	writeEndTag(pod::e_nodeAnimationRotation);
+
+	// Animation Scale, 7 floats per frame of animation
+	writeStartTag(pod::e_nodeAnimationScale, 4 * 7);
+	writeEndTag(pod::e_nodeAnimationScale);
+
 	writeEndTag(pod::e_sceneNode);
 }
 
@@ -612,7 +654,7 @@ void PODWriter::writeTextureBlock(uint index)
 		}
 	}
 
-	// Texture Name (file path not included as in the document)
+	// Texture Name (file path not included as stated in the document)
 	const size_t last_slash_idx = path.rfind('/');
 	if (std::string::npos != last_slash_idx)
 	{

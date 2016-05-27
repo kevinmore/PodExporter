@@ -39,6 +39,7 @@ private:
 
 	ModelLoader m_modelLoader;
 	vector<ModelDataPtr> m_modelDataVec;
+	vector<aiNode*> m_Nodes;
 };
 
 }
