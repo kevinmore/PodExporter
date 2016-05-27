@@ -368,6 +368,8 @@ void PODWriter::writeSceneBlock()
 
 	// Num. Frames (30 fps by default)
 	uint32 numFrames = static_cast<uint32>(m_modelLoader.getAnimationDuration() * 30);
+// 	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
+// 	anim->mChannels[0]->mPositionKeys;
 	writeStartTag(pod::e_sceneNumFrames, 4);
 	write4Bytes(*m_assetStream, numFrames);
 	writeEndTag(pod::e_sceneNumFrames);
@@ -628,8 +630,42 @@ void PODWriter::writeNodeBlock(uint index)
 		}
 	}
 
+	// Animation transforms
+	vector<float32> position, rotation, scale, matrices;
+
 	// Animation Flag
+	uint32 flag = 0;
+	if (animation)
+	{
+		if (animation->mNumPositionKeys > 0)
+		{
+			flag |= 0x01;
+			for (uint i = 0; i < animation->mNumPositionKeys; ++i)
+			{
+				// vec3
+				position.push_back(animation->mPositionKeys[i].mValue.x);
+				position.push_back(animation->mPositionKeys[i].mValue.y);
+				position.push_back(animation->mPositionKeys[i].mValue.z);
+			}
+		}
+		if (animation->mNumRotationKeys > 0)
+		{
+			flag |= 0x02;
+			for (uint i = 0; i < animation->mNumRotationKeys; ++i)
+			{
+				// quaternion
+				position.push_back(animation->mRotationKeys[i].mValue.x);
+				position.push_back(animation->mRotationKeys[i].mValue.y);
+				position.push_back(animation->mRotationKeys[i].mValue.z);
+				position.push_back(animation->mRotationKeys[i].mValue.w); // may need to change order
+			}
+		}
+		if (animation->mNumScalingKeys > 0)
+			flag |= 0x04;
+		// scaling not supported
+	}
 	writeStartTag(pod::e_nodeAnimationFlags, 4);
+	write4Bytes(*m_assetStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);
 
 	// Animation Position, 3 floats per frame of animation
