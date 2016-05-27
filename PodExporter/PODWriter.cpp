@@ -197,11 +197,13 @@ namespace assetWriters {
 PODWriter::PODWriter(ModelLoader& loader)
 	: m_modelLoader(loader)
 	, m_Nodes(loader.getNodeList())
+	, m_exportAnimations(true)
 {
 }
 
-void PODWriter::exportModel(const std::string& path)
+void PODWriter::exportModel(const std::string& path, bool exportAnimations)
 {
+	m_exportAnimations = exportAnimations;
 	Stream::ptr_type assetStream(new FileStream(path, "w"));
 	if (openAssetStream(assetStream))
 	{
@@ -569,7 +571,6 @@ void PODWriter::writeNodeBlock(uint index)
 {
 	aiNode* node = m_Nodes[index];
 
-
 	// write node block
 	// a block that contains only further nested blocks between its Start and End tags 
 	// will have a Length of zero. 
@@ -577,21 +578,55 @@ void PODWriter::writeNodeBlock(uint index)
 
 	// Node Index
 	writeStartTag(pod::e_nodeIndex, 4);
+	write4Bytes(*m_assetStream, index);
 	writeEndTag(pod::e_nodeIndex);
 
 	// Node Name
-	//StringHash name(matData.name);
-	//writeStartTag(pod::e_nodeName, name.length());
-	//writeByteArrayFromeStringHash(*m_assetStream, name);
-	//writeEndTag(pod::e_nodeName);
+	StringHash name(node->mName.C_Str());
+	writeStartTag(pod::e_nodeName, name.length());
+	writeByteArrayFromeStringHash(*m_assetStream, name);
+	writeEndTag(pod::e_nodeName);
 
 	// Material Index (if the node is a mesh)
-	writeStartTag(pod::e_nodeMaterialIndex, 4);
-	writeEndTag(pod::e_nodeMaterialIndex);
+	if (node->mNumMeshes == 1)
+	{
+		writeStartTag(pod::e_nodeMaterialIndex, 4);
+		write4Bytes(*m_assetStream, node->mMeshes[0]); // need fix
+		writeEndTag(pod::e_nodeMaterialIndex);
+	}
 
 	// Parent Index 
+	aiNode* parent = node->mParent;
+	int32 parentIdx = -1;
+	for (uint32 i = 0; i < m_Nodes.size(); ++i)
+	{
+		if (m_Nodes[i] == parent)
+		{
+			parentIdx = i;
+			break;
+		}
+	}
 	writeStartTag(pod::e_nodeParentIndex, 4);
+	write4Bytes(*m_assetStream, parentIdx); // need fix
 	writeEndTag(pod::e_nodeParentIndex);
+
+	// Node Animation
+	if (!m_modelLoader.getScene()->HasAnimations() || !m_exportAnimations)
+	{
+		writeEndTag(pod::e_sceneNode);
+		return;
+	}
+
+	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
+	aiNodeAnim* animation = NULL;
+	for (uint i = 0; i <anim->mNumChannels; ++i)
+	{
+		if (anim->mChannels[i]->mNodeName == node->mName)
+		{
+			animation = anim->mChannels[i];
+			break;
+		}
+	}
 
 	// Animation Flag
 	writeStartTag(pod::e_nodeAnimationFlags, 4);

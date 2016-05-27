@@ -1,5 +1,4 @@
 #include "ModelLoader.h"
-#include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 
 void ModelLoader::clear()
@@ -37,12 +36,11 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	else if (flag == MAX_QUALITY)
 		flags = aiProcessPreset_TargetRealtime_MaxQuality;
 
-	Assimp::Importer importer;
-	m_aiScene = importer.ReadFile(fileName, flags);
+	m_aiScene = m_importer.ReadFile(fileName, flags);
 	
 	if (!m_aiScene)
 	{
-		cout << importer.GetErrorString();
+		cout << m_importer.GetErrorString();
 		vector<ModelDataPtr> empty;
 		return empty;
 	}

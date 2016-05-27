@@ -21,7 +21,6 @@ namespace VEEMEE
 		{
 			ModelLoader loader;
 			vector<ModelDataPtr> models = loader.loadModel(fileName);
-			m_aiScene = loader.getScene();
 
 			pvr::assets::assetWriters::PODWriter exporter(loader);
 			exporter.setModels(models);
@@ -38,8 +37,6 @@ namespace VEEMEE
 
 	private:
 		ModelConverter() {};
-		const aiScene* m_aiScene;
-
 	};
 
 }

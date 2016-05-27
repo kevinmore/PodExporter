@@ -1,5 +1,6 @@
 #pragma once
 #include "Skeleton.h"
+#include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 
 struct MeshData
@@ -72,17 +73,17 @@ public:
 	vector<ModelDataPtr> loadModel(const string& filename, LoadingQuality flag = MAX_QUALITY);
 	string& getFileNmae() { return m_fileName; }
 	const Skeleton* getSkeleton() { return m_skeleton; }
-	const aiScene* getScene() { return m_aiScene; }
-	vector<uint16> geIndexBuffer() { return m_indices; }
-	vector<vec3> getPositionBuffer() { return m_positions; }
-	vector<vec3> getNormalBuffer() { return m_normals; }
-	vector<vec3> getTangetBuffer() { return m_tangents; }
-	vector<vec2> getUVBuffer() { return m_texCoords; }
-	vector<VertexBoneData> getBoneBuffer() { return m_Bones; }
-	vector<Bone> getBoneList() { return m_BoneInfo; }
+	vector<uint16>& geIndexBuffer() { return m_indices; }
+	vector<vec3>& getPositionBuffer() { return m_positions; }
+	vector<vec3>& getNormalBuffer() { return m_normals; }
+	vector<vec3>& getTangetBuffer() { return m_tangents; }
+	vector<vec2>& getUVBuffer() { return m_texCoords; }
+	vector<VertexBoneData>& getBoneBuffer() { return m_Bones; }
+	vector<Bone>& getBoneList() { return m_BoneInfo; }
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
 	uint getNumNodes() { return m_Nodes.size();  }
 	double getAnimationDuration() { return m_animationDuration; }
+	const aiScene* getScene() { return m_aiScene; }
 
 private:
 	/*
@@ -131,6 +132,8 @@ private:
 	*	Members Variables
 	*/
 	string m_fileName;
+	// make the importer as member valuable, so that it does not call FreeScene until the class is destructed
+	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
 	Skeleton* m_skeleton;
 	map<string, uint> m_BoneMapping; // maps a bone name to its index
