@@ -1,6 +1,7 @@
 #pragma once
 #include "PVRAssets/AssetWriter.h"
 #include "ModelLoader.h"
+#include <fstream>
 using std::vector;
 
 namespace pvr {
@@ -28,8 +29,8 @@ public:
 	virtual string getWriterVersion();
 
 private:
-	bool writeStartTag(uint32 identifier, uint32 dataLength);
-	bool writeEndTag(uint32 identifier);
+	void writeStartTag(uint32 identifier, uint32 dataLength);
+	void writeEndTag(uint32 identifier);
 
 	void writeSceneBlock();
 	void writeMaterialBlock(uint index);
@@ -41,6 +42,8 @@ private:
 	vector<ModelDataPtr> m_modelDataVec;
 	vector<aiNode*> m_Nodes;
 	bool m_exportAnimations;
+
+	fstream m_fileStream;
 };
 
 }

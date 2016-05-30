@@ -32,7 +32,7 @@ namespace VEEMEE
 				nameWithoutExtension = fileName.substr(0, last_slash_idx);
 			}
 
-			exporter.exportModel(nameWithoutExtension + ".pod");
+			exporter.exportModel(nameWithoutExtension + ".pod", false);
 		}
 
 	private:

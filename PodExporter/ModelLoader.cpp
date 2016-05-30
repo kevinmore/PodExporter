@@ -1,4 +1,5 @@
 #include "ModelLoader.h"
+#include <sstream>
 #include <assimp/postprocess.h>
 
 void ModelLoader::clear()
@@ -47,6 +48,21 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	// count nodes
 	parseNodes(m_aiScene->mRootNode);
+
+	for (uint i = 0; i < m_Nodes.size(); ++i)
+	{
+		int parentIdx = -1;
+		for (int j = 0; j < m_Nodes.size(); ++j)
+		{
+			if (m_Nodes[j] == m_Nodes[i]->mParent)
+			{
+				parentIdx = j;
+				break;
+			}
+		}
+
+		cout << "\n" << i << " " << parentIdx << " " << m_Nodes[i]->mName.C_Str() ;
+	}
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation.Inverse();
 
@@ -188,12 +204,19 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 	{
 		if (pNode->mMeshes[i] == meshIndex)
 		{
-			result = string(pNode->mName.C_Str());
-
-			// multiple meshes under a root, e.g. hair + head under the root head
-			if (i > 0)
+			if (pNode->mNumMeshes > 1)
 			{
-				result += "_" + i;
+				stringstream ss;
+				ss << i;
+				string suffix = "-submesh" + ss.str();
+				result = string(pNode->mName.C_Str()) + suffix;
+
+				// create mesh nodes
+				aiNode* meshNode = new aiNode(result);
+			}
+			else
+			{
+				result = string(pNode->mName.C_Str());
 			}
 
 			break;
@@ -358,7 +381,7 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 
 	MaterialData data;
 	//data.name = m_fileName + "/material_" + string::number(index);
-	data.name = name.C_Str();
+	data.name = string(name.C_Str());
 
 	color4D ambientColor(0.1f, 0.1f, 0.1f, 1.0f);
 	color4D diffuseColor(0.8f, 0.8f, 0.8f, 1.0f);

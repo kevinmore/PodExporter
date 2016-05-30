@@ -1,3 +1,9 @@
+﻿/************************************************************************/
+/* The reason using std::fstream instead of pvr::FileStream is that
+pvr::FileStream is a text stream, on Windows Systems, it translate byte '\n'
+to '\r\n', which produces one more byte than expected.                  */
+/************************************************************************/
+
 #include "PODWriter.h"
 #include "PVRAssets/FileIO/PODDefines.h"
 #include "PVRAssets/Model.h"
@@ -12,99 +18,91 @@ using namespace assets;
 using namespace pvr::types;
 
 template <typename T>
-bool writeBytes(Stream& stream, T& data)
+void writeBytes(fstream& stream, T& data, streamsize size = 0)
 {
-	uint dataWritten;
-	uint sizez = sizeof(T);
-	return stream.write(sizeof(T), 1, &data, dataWritten);
+	if (size > 0)
+		stream.write(reinterpret_cast<const char *>(&data), size);
+	else
+		stream.write(reinterpret_cast<const char *>(&data), sizeof(T));
 }
 
 template <typename T>
-bool writeByteArray(Stream& stream, T* data, uint32 count)
+void writeByteArray(fstream& stream, T* data, uint32 count)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{
-		bool result = writeBytes(stream, data[i]);
-		if (!result) { return result; }
+		writeBytes(stream, data[i]);
 	}
-	return true;
 }
 
 template <typename T>
-bool write4Bytes(Stream& stream, T& data)
+void write4Bytes(fstream& stream, T& data)
 {
-	uint dataWritten;
-	return stream.write(4, 1, &data, dataWritten);
+	writeBytes(stream, data, 4);
 }
 
 template <typename T>
-bool write4ByteArray(Stream& stream, T* data, uint32 count)
+void write4ByteArray(fstream& stream, T* data, uint32 count)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{
-		if (!write4Bytes(stream, data[i])) { return false; }
+		write4Bytes(stream, data[i]);
 	}
-	return true;
 }
 
 template <typename T>
-bool write2Bytes(Stream& stream, T& data)
+void write2Bytes(fstream& stream, T& data)
 {
-	uint dataWritten;
-	return stream.write(2, 1, &data, dataWritten);
+	writeBytes(stream, data, 2);
 }
 
 template <typename T>
-bool write2ByteArray(Stream& stream, T* data, uint32 count)
+void write2ByteArray(fstream& stream, T* data, uint32 count)
 {
 	for (uint32 i = 0; i < count; ++i)
 	{
-		if (!write2Bytes(stream, data[i])) { return false; }
+		write2Bytes(stream, data[i]);
 	}
-	return true;
 }
 
 template <typename T>
-bool writeByteArrayFromVector(Stream& stream, vector<T>& data)
+void writeByteArrayFromVector(fstream& stream, vector<T>& data)
 {
-	return writeByteArray<T>(stream, data.data(), data.size());
+	writeByteArray<T>(stream, data.data(), data.size());
 }
 
 template <typename T>
-bool write2ByteArrayFromVector(Stream& stream, vector<T>& data)
+void write2ByteArrayFromVector(fstream& stream, vector<T>& data)
 {
-	return write2ByteArray<T>(stream, data.data(), data.size());
+	write2ByteArray<T>(stream, data.data(), data.size());
 }
 
 template <typename T>
-bool write4ByteArrayFromVector(Stream& stream, vector<T>& data)
+void write4ByteArrayFromVector(fstream& stream, vector<T>& data)
 {
-	return write4ByteArray<T>(stream, data.data(), data.size());
+	write4ByteArray<T>(stream, data.data(), data.size());
 }
 
-bool writeByteArrayFromeString(Stream& stream, std::string& data)
+void writeByteArrayFromeString(fstream& stream, std::string& data)
 {
-	return writeByteArray(stream, data.data(), data.length());
+	writeByteArray(stream, data.data(), data.length());
 }
 
-bool writeByteArrayFromeStringHash(Stream& stream, StringHash& data)
+void writeByteArrayFromeStringHash(fstream& stream, StringHash& data)
 {
-	return writeByteArray(stream, data.c_str(), data.length());
+	writeByteArray(stream, data.c_str(), data.length());
 }
 
-bool writeTag(Stream& stream, uint32 tagMask, uint32 identifier, uint32 dataLength)
+void writeTag(fstream& stream, uint32 tagMask, uint32 identifier, uint32 dataLength)
 {
 	uint32 halfTag = identifier | tagMask;
-	if (!write4Bytes(stream, halfTag)) { return false; }
-	if (!write4Bytes(stream, dataLength)) { return false; }
-	return true;
+	write4Bytes(stream, halfTag);
+	write4Bytes(stream, dataLength);
 }
 
 template <typename T>
-bool writeVertexIndexData(Stream& stream, std::vector<T>& data)
+void writeVertexIndexData(fstream& stream, std::vector<T>& data)
 {
-	bool result;
-
 	// write block data type (UInt32 or UInt16)
 	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
 	DataType::Enum type;
@@ -125,22 +123,18 @@ bool writeVertexIndexData(Stream& stream, std::vector<T>& data)
 	switch (sizeof(T))
 	{
 	case 2:
-		result = write2ByteArrayFromVector<T>(stream, data);
+		write2ByteArrayFromVector<T>(stream, data);
 		break;
 	case 4:
-		result = write4ByteArrayFromVector<T>(stream, data);
+		write4ByteArrayFromVector<T>(stream, data);
 		break;
 	}
 	writeTag(stream, pod::c_endTagMask, pod::e_blockData, 0);
-
-	return result;
 }
 
 template <typename T>
-bool writeVertexData(Stream& stream, DataType::Enum type, uint32 numComponents, std::vector<T>& data)
+void writeVertexData(fstream& stream, DataType::Enum type, uint32 numComponents, uint32 stride, std::vector<T>& data)
 {
-	bool result;
-
 	// write block data type
 	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
 	write4Bytes(stream, type);
@@ -153,8 +147,7 @@ bool writeVertexData(Stream& stream, DataType::Enum type, uint32 numComponents, 
 
 	// write stride: The distance, in bytes, from one array member to the next. 
 	writeTag(stream, pod::c_startTagMask, pod::e_blockStride, 4);
-	uint32 stride = DataType::size(type) * numComponents;
-	write4Bytes(stream, stride); // need fix?
+	write4Bytes(stream, stride);
 	writeTag(stream, pod::c_endTagMask, pod::e_blockStride, 0);
 
 	// write the block data buffer
@@ -163,19 +156,40 @@ bool writeVertexData(Stream& stream, DataType::Enum type, uint32 numComponents, 
 	switch (DataType::size(type))
 	{
 	case 1:
-		result = writeByteArrayFromVector<T>(stream, data);
+		writeByteArrayFromVector<T>(stream, data);
 		break;
 	case 2:
-		result = write2ByteArrayFromVector<T>(stream, data);
+		write2ByteArrayFromVector<T>(stream, data);
 		break;
 	case 4:
-		result = write4ByteArrayFromVector<T>(stream, data);
+		write4ByteArrayFromVector<T>(stream, data);
 		break;
 	}
 
 	writeTag(stream, pod::c_endTagMask, pod::e_blockData, 0);
+}
 
-	return result;
+void writeDummyVertexData(fstream& stream, DataType::Enum type, uint32 numComponents, uint32 stride, uint32 offset)
+{
+	// write block data type
+	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
+	write4Bytes(stream, type);
+	writeTag(stream, pod::c_endTagMask, pod::e_blockDataType, 0);
+
+	// write num components (e.g. position buffer, it has x, y, z, so numComponents = 3)
+	writeTag(stream, pod::c_startTagMask, pod::e_blockNumComponents, 4);
+	write4Bytes(stream, numComponents);
+	writeTag(stream, pod::c_endTagMask, pod::e_blockNumComponents, 0);
+
+	// write stride: The distance, in bytes, from one array member to the next. 
+	writeTag(stream, pod::c_startTagMask, pod::e_blockStride, 4);
+	write4Bytes(stream, stride);
+	writeTag(stream, pod::c_endTagMask, pod::e_blockStride, 0);
+
+	// write the block data buffer (here, we write the offset of this vertex attribute)
+	writeTag(stream, pod::c_startTagMask, pod::e_blockData, 4);
+	write4Bytes(stream, offset);
+	writeTag(stream, pod::c_endTagMask, pod::e_blockData, 0);
 }
 
 template <typename T>
@@ -204,16 +218,20 @@ PODWriter::PODWriter(ModelLoader& loader)
 void PODWriter::exportModel(const std::string& path, bool exportAnimations)
 {
 	m_exportAnimations = exportAnimations;
-	Stream::ptr_type assetStream(new FileStream(path, "w"));
-	if (openAssetStream(assetStream))
+
+	m_fileStream = fstream(path, ios::binary | ios::out | ios::trunc);
+
+	if (m_fileStream.is_open())
 	{
 		writeAllAssets();
-		m_assetStream->close();
+		m_fileStream.flush();
+		m_fileStream.close();
 	}
 	else
 	{
 		cout << "\nCannot open file: " << path;
 	}
+
 }
 
 bool PODWriter::addAssetToWrite(const Model & asset)
@@ -230,16 +248,16 @@ bool PODWriter::writeAllAssets()
 {
 	// write pod version block
 	writeStartTag(pod::PODFormatVersion, pod::c_PODFormatVersionLength);
-	writeByteArray(*m_assetStream, pod::c_PODFormatVersion, pod::c_PODFormatVersionLength);
+	writeByteArray(m_fileStream, pod::c_PODFormatVersion, pod::c_PODFormatVersionLength);
 	writeEndTag(pod::PODFormatVersion);
 
 	// write export options (mock up)
-	writeStartTag(pod::ExportOptions, 0);
-	writeEndTag(pod::ExportOptions);
+	//writeStartTag(pod::ExportOptions, 0);
+	//writeEndTag(pod::ExportOptions);
 
 	// write history (mock up)
-	writeStartTag(pod::FileHistory, 0);
-	writeEndTag(pod::FileHistory);
+	//writeStartTag(pod::FileHistory, 0);
+	//writeEndTag(pod::FileHistory);
 
 	// write scene block
 	// a block that contains only further nested blocks between its Start and End tags 
@@ -283,64 +301,64 @@ string PODWriter::getWriterVersion()
 	return "1.0.0";
 }
 
-bool PODWriter::writeStartTag(uint32 identifier, uint32 dataLength)
+void PODWriter::writeStartTag(uint32 identifier, uint32 dataLength)
 {
-	return writeTag(*m_assetStream, pod::c_startTagMask, identifier, dataLength);
+	writeTag(m_fileStream, pod::c_startTagMask, identifier, dataLength);
 }
 
-bool PODWriter::writeEndTag(uint32 identifier)
+void PODWriter::writeEndTag(uint32 identifier)
 {
-	return writeTag(*m_assetStream, pod::c_endTagMask, identifier, 0);
+	writeTag(m_fileStream, pod::c_endTagMask, identifier, 0);
 }
 
 void PODWriter::writeSceneBlock()
 {
 	// unit
-	float32 units = 1.0f;
-	writeStartTag(pod::e_sceneUnits, 4);
-	write4Bytes(*m_assetStream, units);
-	writeEndTag(pod::e_sceneUnits);
+	//float32 units = 1.0f;
+	//writeStartTag(pod::e_sceneUnits, 4);
+	//write4Bytes(m_fileStream, units);
+	//writeEndTag(pod::e_sceneUnits);
 
 	// Clear Colour 
-	float32	clearColor[3] = { 0.f, 0.f, 0.f };
-	writeStartTag(pod::e_sceneClearColor, 3 * sizeof(float32));
-	write4ByteArray(*m_assetStream, &clearColor[0], 3);
-	writeEndTag(pod::e_sceneClearColor);
+	//float32	clearColor[3] = { 0.f, 0.f, 0.f };
+	//writeStartTag(pod::e_sceneClearColor, 3 * sizeof(float32));
+	//write4ByteArray(m_fileStream, &clearColor[0], 3);
+	//writeEndTag(pod::e_sceneClearColor);
 
 	// Ambient Colour 
-	float32	ambientColor[3] = { 0.f, 0.f, 0.f };
-	writeStartTag(pod::e_sceneAmbientColor, 3 * sizeof(float32));
-	write4ByteArray(*m_assetStream, &ambientColor[0], 3);
-	writeEndTag(pod::e_sceneAmbientColor);
+	//float32	ambientColor[3] = { 0.f, 0.f, 0.f };
+	//writeStartTag(pod::e_sceneAmbientColor, 3 * sizeof(float32));
+	//write4ByteArray(m_fileStream, &ambientColor[0], 3);
+	//writeEndTag(pod::e_sceneAmbientColor);
 
 	// Num. Cameras (not supported yet)
-	uint32 numCam = 0;
-	writeStartTag(pod::e_sceneNumCameras, 4);
-	write4Bytes(*m_assetStream, numCam);
-	writeEndTag(pod::e_sceneNumCameras);
+	//uint32 numCam = 0;
+	//writeStartTag(pod::e_sceneNumCameras, 4);
+	//write4Bytes(m_fileStream, numCam);
+	//writeEndTag(pod::e_sceneNumCameras);
 
 	// Num. Lights (not supported yet)
-	uint32 numLights = 0;
-	writeStartTag(pod::e_sceneNumLights, 4);
-	write4Bytes(*m_assetStream, numLights);
-	writeEndTag(pod::e_sceneNumLights);
+	//uint32 numLights = 0;
+	//writeStartTag(pod::e_sceneNumLights, 4);
+	//write4Bytes(m_fileStream, numLights);
+	//writeEndTag(pod::e_sceneNumLights);
 
 	// Num. Meshes
 	uint32 numMeshes = m_modelDataVec.size();
 	writeStartTag(pod::e_sceneNumMeshes, 4);
-	write4Bytes(*m_assetStream, numMeshes);
+	write4Bytes(m_fileStream, numMeshes);
 	writeEndTag(pod::e_sceneNumMeshes);
 
 	// Num. Nodes
 	uint32 numNodes = m_modelLoader.getNumNodes();
 	writeStartTag(pod::e_sceneNumNodes, 4);
-	write4Bytes(*m_assetStream, numNodes);
+	write4Bytes(m_fileStream, numNodes);
 	writeEndTag(pod::e_sceneNumNodes);
 
 	// Num. Mesh Nodes
 	uint32 numMeshNodes = m_modelDataVec.size();
 	writeStartTag(pod::e_sceneNumMeshNodes, 4);
-	write4Bytes(*m_assetStream, numMeshNodes);
+	write4Bytes(m_fileStream, numMeshNodes);
 	writeEndTag(pod::e_sceneNumMeshNodes);
 
 	// Num. Textures
@@ -357,35 +375,38 @@ void PODWriter::writeSceneBlock()
 			++numTextures;
 	}
 	writeStartTag(pod::e_sceneNumTextures, 4);
-	write4Bytes(*m_assetStream, numTextures);
+	write4Bytes(m_fileStream, numTextures);
 	writeEndTag(pod::e_sceneNumTextures);
 
 	// Num. Materials (1 mesh 1 material)
 	uint32 numMaterials = m_modelDataVec.size();
 	writeStartTag(pod::e_sceneNumMaterials, 4);
-	write4Bytes(*m_assetStream, numMaterials);
+	write4Bytes(m_fileStream, numMaterials);
 	writeEndTag(pod::e_sceneNumMaterials);
 
 	// Num. Frames
-	uint32 numFrames = m_modelLoader.getScene()->HasAnimations() ?
+	uint32 numFrames = (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations) ?
 		std::max(std::max(m_modelLoader.getScene()->mAnimations[0]->mChannels[0]->mNumPositionKeys,
 			m_modelLoader.getScene()->mAnimations[0]->mChannels[0]->mNumRotationKeys),
 			m_modelLoader.getScene()->mAnimations[0]->mChannels[0]->mNumScalingKeys)
 		: 0;
 	writeStartTag(pod::e_sceneNumFrames, 4);
-	write4Bytes(*m_assetStream, numFrames);
+	write4Bytes(m_fileStream, numFrames);
 	writeEndTag(pod::e_sceneNumFrames);
 
-	// FPS (30 fps by default)
-	uint32 fps = 30;
-	writeStartTag(pod::e_sceneFPS, 4);
-	write4Bytes(*m_assetStream, fps);
-	writeEndTag(pod::e_sceneFPS);
+	if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
+	{
+		// FPS (30 fps by default)
+		uint32 fps = 30;
+		writeStartTag(pod::e_sceneFPS, 4);
+		write4Bytes(m_fileStream, fps);
+		writeEndTag(pod::e_sceneFPS);
+	}
 
 	// Scene flags (0)
 	uint32 flag = 0;
 	writeStartTag(pod::e_sceneFlags, 4);
-	write4Bytes(*m_assetStream, flag);
+	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_sceneFlags);
 
 	// Material Block
@@ -425,13 +446,13 @@ void PODWriter::writeMaterialBlock(uint index)
 	// Material Flags (blending disabled)
 	uint32	flags = 0;
 	writeStartTag(pod::e_materialFlags, 4);
-	write4Bytes(*m_assetStream, flags);
+	write4Bytes(m_fileStream, flags);
 	writeEndTag(pod::e_materialFlags);
 
 	// Material Name
 	StringHash name(matData.name);
 	writeStartTag(pod::e_materialName, name.length());
-	writeByteArrayFromeStringHash(*m_assetStream, name);
+	writeByteArrayFromeStringHash(m_fileStream, name);
 	writeEndTag(pod::e_materialName);
 
 	// Texture Index
@@ -450,7 +471,7 @@ void PODWriter::writeMaterialBlock(uint index)
 	if (!matData.textureData.diffuseMap.empty())
 	{
 		writeStartTag(pod::e_materialDiffuseTextureIndex, 4);
-		write4Bytes(*m_assetStream, offset);
+		write4Bytes(m_fileStream, offset);
 		writeEndTag(pod::e_materialDiffuseTextureIndex);
 		++offset;
 	}
@@ -458,7 +479,7 @@ void PODWriter::writeMaterialBlock(uint index)
 	if (!matData.textureData.normalMap.empty())
 	{
 		writeStartTag(pod::e_materialBumpMapTextureIndex, 4);
-		write4Bytes(*m_assetStream, offset);
+		write4Bytes(m_fileStream, offset);
 		writeEndTag(pod::e_materialBumpMapTextureIndex);
 		++offset;
 	}
@@ -466,7 +487,7 @@ void PODWriter::writeMaterialBlock(uint index)
 	if (!matData.textureData.specularMap.empty())
 	{
 		writeStartTag(pod::e_materialSpecularColorTextureIndex, 4);
-		write4Bytes(*m_assetStream, offset);
+		write4Bytes(m_fileStream, offset);
 		writeEndTag(pod::e_materialSpecularColorTextureIndex);
 		++offset;
 	}
@@ -474,24 +495,24 @@ void PODWriter::writeMaterialBlock(uint index)
 	// Ambient Color
 	float32	ambientColor[3] = { matData.ambientColor.r, matData.ambientColor.g, matData.ambientColor.b };
 	writeStartTag(pod::e_materialAmbientColor, 3 * sizeof(float32));
-	write4ByteArray(*m_assetStream, &ambientColor[0], 3);
+	write4ByteArray(m_fileStream, &ambientColor[0], 3);
 	writeEndTag(pod::e_materialAmbientColor);
 
 	// Diffuse Color
 	float32	diffuseColor[3] = { matData.diffuseColor.r, matData.diffuseColor.g, matData.diffuseColor.b };
 	writeStartTag(pod::e_materialDiffuseColor, 3 * sizeof(float32));
-	write4ByteArray(*m_assetStream, &diffuseColor[0], 3);
+	write4ByteArray(m_fileStream, &diffuseColor[0], 3);
 	writeEndTag(pod::e_materialDiffuseColor);
 
 	// Specular Color
 	float32	specularColor[3] = { matData.specularColor.r, matData.specularColor.g, matData.specularColor.b };
 	writeStartTag(pod::e_materialSpecularColor, 3 * sizeof(float32));
-	write4ByteArray(*m_assetStream, &specularColor[0], 3);
+	write4ByteArray(m_fileStream, &specularColor[0], 3);
 	writeEndTag(pod::e_materialSpecularColor);
 
 	// Shininess
 	writeStartTag(pod::e_materialShininess, 4);
-	write4Bytes(*m_assetStream, (float32)matData.shininess);
+	write4Bytes(m_fileStream, matData.shininess);
 	writeEndTag(pod::e_materialShininess);
 
 	writeEndTag(pod::e_sceneMaterial);
@@ -508,26 +529,13 @@ void PODWriter::writeMeshBlock(uint index)
 
 	// Num. Vertices
 	writeStartTag(pod::e_meshNumVertices, 4);
-	write4Bytes(*m_assetStream, (uint32)meshData.numVertices);
+	write4Bytes(m_fileStream, (uint32)meshData.numVertices);
 	writeEndTag(pod::e_meshNumVertices);
 
 	// Num. Faces
 	writeStartTag(pod::e_meshNumFaces, 4);
-	write4Bytes(*m_assetStream, (uint32)meshData.numFaces);
+	write4Bytes(m_fileStream, (uint32)meshData.numFaces);
 	writeEndTag(pod::e_meshNumFaces);
-
-
-
-	// Vertex Index List
-// 	vector<uint16> entireIndexBuffer = m_modelLoader.geIndexBuffer();
-// 	vector<uint16> currentIndexBuffer;
-// 	for (uint i = meshData.baseIndex; i < meshData.baseIndex + meshData.numIndices; ++i)
-// 	{
-// 		currentIndexBuffer.push_back(entireIndexBuffer[i]);
-// 	}
-// 	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * currentIndexBuffer.size());
-// 	writeVertexIndexData<uint16>(*m_assetStream, currentIndexBuffer);
-// 	writeEndTag(pod::e_meshVertexIndexList);
 
 	// Vertex List (Position)
 	vector<vec3> positionBuffer = m_modelLoader.getPositionBuffer();
@@ -543,57 +551,91 @@ void PODWriter::writeMeshBlock(uint index)
 
 	// Interleaved Data List
 	// Structure: position.xyz + normal.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 52 bytes)
-//	uint32 stride = sizeof(positionBuffer[0]) +sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
-// 	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
-//  	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
-//  	{
-//  		writeBytes(*m_assetStream, positionBuffer[i]);
-//  		writeBytes(*m_assetStream, normalBuffer[i]);
-//  		writeBytes(*m_assetStream, uvBuffer[i]);
-//  		writeBytes(*m_assetStream, boneBuffer[i].Weights);
-//  		writeBytes(*m_assetStream, boneBuffer[i].IDs);
-//  	}
-// 	writeEndTag(pod::e_meshInterleavedDataList);
+	uint32 stride = (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations) ?
+		sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0])
+		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]);
+	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
+	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
+	{
+		writeBytes(m_fileStream, positionBuffer[i]);
+		writeBytes(m_fileStream, normalBuffer[i]);
+		writeBytes(m_fileStream, uvBuffer[i]);
+		if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
+		{
+			writeBytes(m_fileStream, boneBuffer[i].Weights);
+			writeBytes(m_fileStream, boneBuffer[i].IDs);
+		}
+	}
+ 	writeEndTag(pod::e_meshInterleavedDataList);
 
-	writeStartTag(pod::e_meshInterleavedDataList, 8);
-	float y = positionBuffer[10].y;
-	float a = boneBuffer[10].Weights[0];
-	uint sizey = sizeof(y);
-	uint sizea = sizeof(a);
+	if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
+	{
+		// Max. Num. Bones per Batch 
+		//writeStartTag(pod::e_meshMaxNumBonesPerBatch, 4);
+		//writeEndTag(pod::e_meshMaxNumBonesPerBatch);
 
+		// Num. Bone Batches 
+		//writeStartTag(pod::e_meshNumBoneBatches, 4);
+		//writeEndTag(pod::e_meshNumBoneBatches);
 
-	unsigned char const * p = reinterpret_cast<unsigned char const *>(&y);
+		// Bone Batch Index List 
+		// A list of indices into the "Node" list, each indexed "Node" representing the transformations associated with a single bone. 
+		// (Read via £Bone Index List"). 
+		//writeStartTag(pod::e_meshBoneBatchIndexList, 400);
+		//writeEndTag(pod::e_meshBoneBatchIndexList);
 
-	unsigned char p0 = p[0];
+		// Num. Bone Indices per Batch 
+		// A list of integers, each integer representing the number of indices in each batch in the "Bone Batch Index List"
+		//writeStartTag(pod::e_meshNumBoneIndicesPerBatch, 8);
+		//writeEndTag(pod::e_meshNumBoneIndicesPerBatch);
 
-	//write4Bytes(*m_assetStream, x);
-	//writeBytes(*m_assetStream, y);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
-	writeBytes(*m_assetStream, p[0]);
+		// Bone Offset per Batch
+		// A list of integers, each integer representing the offset into the "Vertex List", 
+		// or "Vertex Index List" of the data is indexed, the batch starts at. 
+		//writeStartTag(pod::e_meshBoneOffsetPerBatch, 8);
+		//writeEndTag(pod::e_meshBoneOffsetPerBatch);
+	}
 
-	//write4Bytes(*m_assetStream, z);
- 	//writeBytes(*m_assetStream, normalBuffer[10]);
- 	//writeBytes(*m_assetStream, uvBuffer[10]);
- 	//writeBytes(*m_assetStream, boneBuffer[10].Weights[0]);
- 	//writeBytes(*m_assetStream, boneBuffer[10].IDs);
-	writeEndTag(pod::e_meshInterleavedDataList);
+	// Vertex Index List
+	vector<uint16> entireIndexBuffer = m_modelLoader.geIndexBuffer();
+	vector<uint16> currentIndexBuffer;
+	for (uint i = meshData.baseIndex; i < meshData.baseIndex + meshData.numIndices; ++i)
+	{
+		currentIndexBuffer.push_back(entireIndexBuffer[i]);
+	}
+	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * currentIndexBuffer.size());
+	writeVertexIndexData<uint16>(m_fileStream, currentIndexBuffer);
+	writeEndTag(pod::e_meshVertexIndexList);
 
-// 	writeStartTag(pod::e_meshVertexList, sizeof(vec3) * currentPositionBuffer.size());
-// 	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentPositionBuffer);
-// 	writeEndTag(pod::e_meshVertexList);
-// 	writeStartTag(pod::e_meshNormalList, sizeof(vec3) * currentNormalBuffer.size());
-// 	writeVertexData<vec3>(*m_assetStream, DataType::Float32, 3, currentNormalBuffer);
-// 	writeEndTag(pod::e_meshNormalList);
-// 
-// 	writeStartTag(pod::e_meshUVWList, sizeof(vec2) * currentUVBuffer.size());
-// 	writeVertexData<vec2>(*m_assetStream, DataType::Float32, 2, currentUVBuffer);
-// 	writeEndTag(pod::e_meshUVWList);
+	// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
+	uint32 offset = 0;
+	writeStartTag(pod::e_meshVertexList, 0);
+	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+	offset += DataType::size(DataType::Float32) * 3;
+	writeEndTag(pod::e_meshVertexList);
+
+	writeStartTag(pod::e_meshNormalList, 0);
+	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+	offset += DataType::size(DataType::Float32) * 3;
+	writeEndTag(pod::e_meshNormalList);
+
+	writeStartTag(pod::e_meshUVWList, 0);
+	writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);
+	offset += DataType::size(DataType::Float32) * 2;
+	writeEndTag(pod::e_meshUVWList);
+
+	if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
+	{
+		writeStartTag(pod::e_meshBoneWeightList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 4, stride, offset);
+		offset += DataType::size(DataType::Float32) * 4;
+		writeEndTag(pod::e_meshBoneWeightList);
+
+		writeStartTag(pod::e_meshBoneIndexList, 0);
+		writeDummyVertexData(m_fileStream, DataType::UInt8, 4, stride, offset);
+		offset += DataType::size(DataType::UInt8) * 4;
+		writeEndTag(pod::e_meshBoneIndexList);
+	}
 
 	writeEndTag(pod::e_sceneMesh);
 }
@@ -609,20 +651,20 @@ void PODWriter::writeNodeBlock(uint index)
 
 	// Node Index
 	writeStartTag(pod::e_nodeIndex, 4);
-	write4Bytes(*m_assetStream, index);
+	write4Bytes(m_fileStream, index);
 	writeEndTag(pod::e_nodeIndex);
 
 	// Node Name
 	StringHash name(node->mName.C_Str());
 	writeStartTag(pod::e_nodeName, name.length());
-	writeByteArrayFromeStringHash(*m_assetStream, name);
+	writeByteArrayFromeStringHash(m_fileStream, name);
 	writeEndTag(pod::e_nodeName);
 
 	// Material Index (if the node is a mesh)
 	if (node->mNumMeshes == 1)
 	{
 		writeStartTag(pod::e_nodeMaterialIndex, 4);
-		write4Bytes(*m_assetStream, node->mMeshes[0]); // need fix
+		write4Bytes(m_fileStream, node->mMeshes[0]); // need fix
 		writeEndTag(pod::e_nodeMaterialIndex);
 	}
 
@@ -638,7 +680,7 @@ void PODWriter::writeNodeBlock(uint index)
 		}
 	}
 	writeStartTag(pod::e_nodeParentIndex, 4);
-	write4Bytes(*m_assetStream, parentIdx); // need fix
+	write4Bytes(m_fileStream, parentIdx); // need fix
 	writeEndTag(pod::e_nodeParentIndex);
 
 	// Node Animation
@@ -694,7 +736,7 @@ void PODWriter::writeNodeBlock(uint index)
 		// scaling not supported
 	}
 	writeStartTag(pod::e_nodeAnimationFlags, 4);
-	write4Bytes(*m_assetStream, flag);
+	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);
 
 	// Animation Position, 3 floats per frame of animation
@@ -763,7 +805,7 @@ void PODWriter::writeTextureBlock(uint index)
 
 	StringHash name(path);
 	writeStartTag(pod::e_textureFilename, name.length());
-	writeByteArrayFromeStringHash(*m_assetStream, name);
+	writeByteArrayFromeStringHash(m_fileStream, name);
 	writeEndTag(pod::e_textureFilename);
 
 	writeEndTag(pod::e_sceneTexture);
