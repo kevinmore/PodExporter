@@ -366,10 +366,12 @@ void PODWriter::writeSceneBlock()
 	write4Bytes(*m_assetStream, numMaterials);
 	writeEndTag(pod::e_sceneNumMaterials);
 
-	// Num. Frames (30 fps by default)
-	uint32 numFrames = static_cast<uint32>(m_modelLoader.getAnimationDuration() * 30);
-// 	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
-// 	anim->mChannels[0]->mPositionKeys;
+	// Num. Frames
+	uint32 numFrames = m_modelLoader.getScene()->HasAnimations() ?
+		std::max(std::max(m_modelLoader.getScene()->mAnimations[0]->mChannels[0]->mNumPositionKeys,
+			m_modelLoader.getScene()->mAnimations[0]->mChannels[0]->mNumRotationKeys),
+			m_modelLoader.getScene()->mAnimations[0]->mChannels[0]->mNumScalingKeys)
+		: 0;
 	writeStartTag(pod::e_sceneNumFrames, 4);
 	write4Bytes(*m_assetStream, numFrames);
 	writeEndTag(pod::e_sceneNumFrames);
@@ -392,7 +394,11 @@ void PODWriter::writeSceneBlock()
 		writeMaterialBlock(i);
 	}
 
-
+	// Mesh Block
+	for (uint i = 0; i < m_modelDataVec.size(); ++i)
+	{
+		writeMeshBlock(i);
+	}
 
 	// Node Block
 	for (uint32 i = 0; i < numNodes; ++i)
@@ -404,12 +410,6 @@ void PODWriter::writeSceneBlock()
 	for (uint32 i = 0; i < numTextures; ++i)
 	{
 		writeTextureBlock(i);
-	}
-
-	// Mesh Block
-	for (uint i = 0; i < m_modelDataVec.size(); ++i)
-	{
-		writeMeshBlock(i);
 	}
 }
 
@@ -543,16 +543,45 @@ void PODWriter::writeMeshBlock(uint index)
 
 	// Interleaved Data List
 	// Structure: position.xyz + normal.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 52 bytes)
-	uint32 stride = sizeof(positionBuffer[0]) +sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
-	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
- 	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
- 	{
- 		writeBytes(*m_assetStream, positionBuffer[i]);
- 		writeBytes(*m_assetStream, normalBuffer[i]);
- 		writeBytes(*m_assetStream, uvBuffer[i]);
- 		writeBytes(*m_assetStream, boneBuffer[i].Weights);
- 		writeBytes(*m_assetStream, boneBuffer[i].IDs);
- 	}
+//	uint32 stride = sizeof(positionBuffer[0]) +sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
+// 	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
+//  	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
+//  	{
+//  		writeBytes(*m_assetStream, positionBuffer[i]);
+//  		writeBytes(*m_assetStream, normalBuffer[i]);
+//  		writeBytes(*m_assetStream, uvBuffer[i]);
+//  		writeBytes(*m_assetStream, boneBuffer[i].Weights);
+//  		writeBytes(*m_assetStream, boneBuffer[i].IDs);
+//  	}
+// 	writeEndTag(pod::e_meshInterleavedDataList);
+
+	writeStartTag(pod::e_meshInterleavedDataList, 8);
+	float y = positionBuffer[10].y;
+	float a = boneBuffer[10].Weights[0];
+	uint sizey = sizeof(y);
+	uint sizea = sizeof(a);
+
+
+	unsigned char const * p = reinterpret_cast<unsigned char const *>(&y);
+
+	unsigned char p0 = p[0];
+
+	//write4Bytes(*m_assetStream, x);
+	//writeBytes(*m_assetStream, y);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+	writeBytes(*m_assetStream, p[0]);
+
+	//write4Bytes(*m_assetStream, z);
+ 	//writeBytes(*m_assetStream, normalBuffer[10]);
+ 	//writeBytes(*m_assetStream, uvBuffer[10]);
+ 	//writeBytes(*m_assetStream, boneBuffer[10].Weights[0]);
+ 	//writeBytes(*m_assetStream, boneBuffer[10].IDs);
 	writeEndTag(pod::e_meshInterleavedDataList);
 
 // 	writeStartTag(pod::e_meshVertexList, sizeof(vec3) * currentPositionBuffer.size());
