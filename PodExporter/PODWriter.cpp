@@ -85,12 +85,20 @@ void write4ByteArrayFromVector(fstream& stream, vector<T>& data)
 
 void writeByteArrayFromeString(fstream& stream, std::string& data)
 {
-	writeByteArray(stream, data.data(), data.length());
+	writeByteArray(stream, data.c_str(), data.length());
+
+	// write the null terminator
+	const char* end = "\0";
+	writeBytes(stream, *end, 1);
 }
 
 void writeByteArrayFromeStringHash(fstream& stream, StringHash& data)
 {
 	writeByteArray(stream, data.c_str(), data.length());
+
+	// write the null terminator
+	const char* end = "\0";
+	writeBytes(stream, *end, 1);
 }
 
 void writeTag(fstream& stream, uint32 tagMask, uint32 identifier, uint32 dataLength)
@@ -252,12 +260,16 @@ bool PODWriter::writeAllAssets()
 	writeEndTag(pod::PODFormatVersion);
 
 	// write export options (mock up)
-	//writeStartTag(pod::ExportOptions, 0);
-	//writeEndTag(pod::ExportOptions);
+	std::string options = "bFlipTextureV=0\nbIndexed=1\nbInterleaved=1\nbSortVertices=1\nbTangentSpace=0\nbExportAnimations=0\nbIndexAnimations=1\nbExportGeometry=1\nbExportMatrices=0\nbExportMappingChannels=1\nbExportMaterials=1\nbExportSkin=0\nbInvertTransparency=0\nbExportModelSpace=1\nbMerge=0\nbUseCustomOptSettings=0\nbExportUserData=0\nbUnpackMatrix=0\nbExportBoneGeometry=0\nbAlignData=1\nbDisplayInShaman=0\nbUsePostExportCL=0\nfTangentSpaceVtxSplit=0.00\neExpFormat=0\ncS=2\neTriSort=1\nePrimType=0\nsClPostTarget=\nsClPostArgs=\nsClPostCWD=\nsPathToShaman=\nsMergeSrc=\nsScriptFile=\nuiStaticFrame=0\nuiBoneLimit=9\nuiPadDataTo=4\nuiTSUseUVW=0\nsVcOptPos.bExport=1\nsVcOptPos.eType=1\nsVcOptPos.nEnable=1196167\nsVcOptNor.bExport=1\nsVcOptNor.eType=1\nsVcOptNor.nEnable=1196167\nsVcOptTan.bExport=1\nsVcOptTan.eType=1\nsVcOptTan.nEnable=1196167\nsVcOptBin.bExport=1\nsVcOptBin.eType=1\nsVcOptBin.nEnable=1196167\nsVcOptCol.bExport=0\nsVcOptCol.eType=5\nsVcOptCol.nEnable=1198095\nsVcOptBoneInd.bExport=1\nsVcOptBoneInd.eType=10\nsVcOptBoneInd.nEnable=1198095\nsVcOptBoneWt.bExport=1\nsVcOptBoneWt.eType=1\nsVcOptBoneWt.nEnable=1198095\npsVcOptUVW[0].bExport=1\npsVcOptUVW[0].eType=1\npsVcOptUVW[0].nEnable=1056901\npsVcOptUVW[1].bExport=0\npsVcOptUVW[1].eType=1\npsVcOptUVW[1].nEnable=1179779\npsVcOptUVW[2].bExport=0\npsVcOptUVW[2].eType=1\npsVcOptUVW[2].nEnable=1179779\npsVcOptUVW[3].bExport=0\npsVcOptUVW[3].eType=1\npsVcOptUVW[3].nEnable=1179779\npsVcOptUVW[4].bExport=0\npsVcOptUVW[4].eType=1\npsVcOptUVW[4].nEnable=1179779\npsVcOptUVW[5].bExport=0\npsVcOptUVW[5].eType=1\npsVcOptUVW[5].nEnable=1179779\npsVcOptUVW[6].bExport=0\npsVcOptUVW[6].eType=1\npsVcOptUVW[6].nEnable=1179779\npsVcOptUVW[7].bExport=0\npsVcOptUVW[7].eType=1\npsVcOptUVW[7].nEnable=1179779\n";
+	writeStartTag(pod::ExportOptions, options.length() + 1);
+	writeByteArrayFromeString(m_fileStream, options);
+	writeEndTag(pod::ExportOptions);
 
 	// write history (mock up)
-	//writeStartTag(pod::FileHistory, 0);
-	//writeEndTag(pod::FileHistory);
+	std::string history = "PVRGeoPOD 2.17.1 | 16.1@3959323";
+	writeStartTag(pod::FileHistory, history.length() + 1);
+	writeByteArrayFromeString(m_fileStream, history);
+	writeEndTag(pod::FileHistory);
 
 	// write scene block
 	// a block that contains only further nested blocks between its Start and End tags 
@@ -314,34 +326,34 @@ void PODWriter::writeEndTag(uint32 identifier)
 void PODWriter::writeSceneBlock()
 {
 	// unit
-	//float32 units = 1.0f;
-	//writeStartTag(pod::e_sceneUnits, 4);
-	//write4Bytes(m_fileStream, units);
-	//writeEndTag(pod::e_sceneUnits);
+	float32 units = 1.0f;
+	writeStartTag(pod::e_sceneUnits, 4);
+	write4Bytes(m_fileStream, units);
+	writeEndTag(pod::e_sceneUnits);
 
 	// Clear Colour 
-	//float32	clearColor[3] = { 0.f, 0.f, 0.f };
-	//writeStartTag(pod::e_sceneClearColor, 3 * sizeof(float32));
-	//write4ByteArray(m_fileStream, &clearColor[0], 3);
-	//writeEndTag(pod::e_sceneClearColor);
+	float32	clearColor[3] = { 0.f, 0.f, 0.f };
+	writeStartTag(pod::e_sceneClearColor, 3 * sizeof(float32));
+	write4ByteArray(m_fileStream, &clearColor[0], 3);
+	writeEndTag(pod::e_sceneClearColor);
 
 	// Ambient Colour 
-	//float32	ambientColor[3] = { 0.f, 0.f, 0.f };
-	//writeStartTag(pod::e_sceneAmbientColor, 3 * sizeof(float32));
-	//write4ByteArray(m_fileStream, &ambientColor[0], 3);
-	//writeEndTag(pod::e_sceneAmbientColor);
+	float32	ambientColor[3] = { 0.f, 0.f, 0.f };
+	writeStartTag(pod::e_sceneAmbientColor, 3 * sizeof(float32));
+	write4ByteArray(m_fileStream, &ambientColor[0], 3);
+	writeEndTag(pod::e_sceneAmbientColor);
 
 	// Num. Cameras (not supported yet)
-	//uint32 numCam = 0;
-	//writeStartTag(pod::e_sceneNumCameras, 4);
-	//write4Bytes(m_fileStream, numCam);
-	//writeEndTag(pod::e_sceneNumCameras);
+	uint32 numCam = 0;
+	writeStartTag(pod::e_sceneNumCameras, 4);
+	write4Bytes(m_fileStream, numCam);
+	writeEndTag(pod::e_sceneNumCameras);
 
 	// Num. Lights (not supported yet)
-	//uint32 numLights = 0;
-	//writeStartTag(pod::e_sceneNumLights, 4);
-	//write4Bytes(m_fileStream, numLights);
-	//writeEndTag(pod::e_sceneNumLights);
+	uint32 numLights = 0;
+	writeStartTag(pod::e_sceneNumLights, 4);
+	write4Bytes(m_fileStream, numLights);
+	writeEndTag(pod::e_sceneNumLights);
 
 	// Num. Meshes
 	uint32 numMeshes = m_modelDataVec.size();
@@ -451,7 +463,7 @@ void PODWriter::writeMaterialBlock(uint index)
 
 	// Material Name
 	StringHash name(matData.name);
-	writeStartTag(pod::e_materialName, name.length());
+	writeStartTag(pod::e_materialName, name.length() + 1);
 	writeByteArrayFromeStringHash(m_fileStream, name);
 	writeEndTag(pod::e_materialName);
 
@@ -656,7 +668,7 @@ void PODWriter::writeNodeBlock(uint index)
 
 	// Node Name
 	StringHash name(node->mName.C_Str());
-	writeStartTag(pod::e_nodeName, name.length());
+	writeStartTag(pod::e_nodeName, name.length() + 1);
 	writeByteArrayFromeStringHash(m_fileStream, name);
 	writeEndTag(pod::e_nodeName);
 
@@ -804,7 +816,7 @@ void PODWriter::writeTextureBlock(uint index)
 	}
 
 	StringHash name(path);
-	writeStartTag(pod::e_textureFilename, name.length());
+	writeStartTag(pod::e_textureFilename, name.length() + 1);
 	writeByteArrayFromeStringHash(m_fileStream, name);
 	writeEndTag(pod::e_textureFilename);
 
