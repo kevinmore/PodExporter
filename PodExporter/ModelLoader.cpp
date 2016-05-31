@@ -46,24 +46,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		return empty;
 	}
 
-	// count nodes
-	parseNodes(m_aiScene->mRootNode);
-
-	for (uint i = 0; i < m_Nodes.size(); ++i)
-	{
-		int parentIdx = -1;
-		for (int j = 0; j < m_Nodes.size(); ++j)
-		{
-			if (m_Nodes[j] == m_Nodes[i]->mParent)
-			{
-				parentIdx = j;
-				break;
-			}
-		}
-
-		cout << "\n" << i << " " << parentIdx << " " << m_Nodes[i]->mName.C_Str() ;
-	}
-
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation.Inverse();
 
 	uint numVertices = 0, numIndices = 0, numFaces = 0;
@@ -124,6 +106,24 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 		// print out the skeleton
 		//m_skeleton->dumpSkeleton(skeleton_root, 0);
+	}
+
+	// parse nodes
+	parseMeshNodes(m_aiScene->mRootNode);
+	parseOtherNodes(m_aiScene->mRootNode);
+	for (uint i = 0; i < m_Nodes.size(); ++i)
+	{
+		int parentIdx = -1;
+		for (int j = 0; j < (int)m_Nodes.size(); ++j)
+		{
+			if (m_Nodes[j] == m_Nodes[i]->mParent)
+			{
+				parentIdx = j;
+				break;
+			}
+		}
+
+		cout << "\n" << i << " " << parentIdx << " " << m_Nodes[i]->mName.C_Str();
 	}
 
 	cout << "Loaded " << fileName << endl;
@@ -213,6 +213,10 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 
 				// create mesh nodes
 				aiNode* meshNode = new aiNode(result);
+				meshNode->mNumMeshes = 1;
+				meshNode->mParent = pNode->mParent;
+				meshNode->mMeshes = new unsigned int[1]{ meshIndex };
+				m_Nodes.push_back(meshNode);
 			}
 			else
 			{
@@ -538,14 +542,28 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	return data;
 }
 
-void ModelLoader::parseNodes(aiNode* pNode)
+void ModelLoader::parseMeshNodes(aiNode* pNode)
 {
 	if (!pNode) return;
 
-	m_Nodes.push_back(pNode);
+	if(pNode->mNumMeshes == 1)
+		m_Nodes.push_back(pNode);
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
-		parseNodes(pNode->mChildren[i]);
+		parseMeshNodes(pNode->mChildren[i]);
+	}
+}
+
+void ModelLoader::parseOtherNodes(aiNode* pNode)
+{
+	if (!pNode) return;
+
+	if (pNode->mNumMeshes == 0)
+		m_Nodes.push_back(pNode);
+
+	for (size_t i = 0; i < pNode->mNumChildren; ++i)
+	{
+		parseOtherNodes(pNode->mChildren[i]);
 	}
 }

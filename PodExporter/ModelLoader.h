@@ -97,7 +97,8 @@ private:
 	void generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 
-	void parseNodes(aiNode* pNode);
+	void parseMeshNodes(aiNode* pNode);
+	void parseOtherNodes(aiNode* pNode);
 
 	/*
 	*	Clean up
