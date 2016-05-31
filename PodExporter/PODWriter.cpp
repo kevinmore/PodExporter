@@ -374,18 +374,7 @@ void PODWriter::writeSceneBlock()
 	writeEndTag(pod::e_sceneNumMeshNodes);
 
 	// Num. Textures
-	uint32 numTextures = 0;
-	for (uint i = 0; i < m_modelDataVec.size(); ++i)
-	{
-		ModelDataPtr md = m_modelDataVec[i];
-
-		if (!md->materialData.textureData.diffuseMap.empty())
-			++numTextures;
-		if (!md->materialData.textureData.normalMap.empty())
-			++numTextures;
-		if (!md->materialData.textureData.specularMap.empty())
-			++numTextures;
-	}
+	uint32 numTextures = m_modelLoader.getNumTextures();
 	writeStartTag(pod::e_sceneNumTextures, 4);
 	write4Bytes(m_fileStream, numTextures);
 	writeEndTag(pod::e_sceneNumTextures);
@@ -472,18 +461,13 @@ void PODWriter::writeMaterialBlock(uint index)
 	uint offset = 0;
 	for (uint i = 0; i < index; ++i)
 	{
-		if (!m_modelDataVec[i]->materialData.textureData.diffuseMap.empty())
-			++offset;
-		if (!m_modelDataVec[i]->materialData.textureData.normalMap.empty())
-			++offset;
-		if (!m_modelDataVec[i]->materialData.textureData.specularMap.empty())
-			++offset;
+		offset += m_modelDataVec[i]->materialData.textureData.texturesMap.size();
 	}
 
 	int32 emptyTextureIndex = -1;
 
 	writeStartTag(pod::e_materialDiffuseTextureIndex, 4);
-	if (!matData.textureData.diffuseMap.empty())
+	if (!matData.textureData.texturesMap[aiTextureType_DIFFUSE].empty())
 	{
 		write4Bytes(m_fileStream, offset);
 		++offset;
@@ -494,21 +478,106 @@ void PODWriter::writeMaterialBlock(uint index)
 	}
 	writeEndTag(pod::e_materialDiffuseTextureIndex);
 
-	if (!matData.textureData.normalMap.empty())
+	writeStartTag(pod::e_materialAmbientTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_AMBIENT].empty())
 	{
-		writeStartTag(pod::e_materialBumpMapTextureIndex, 4);
 		write4Bytes(m_fileStream, offset);
-		writeEndTag(pod::e_materialBumpMapTextureIndex);
 		++offset;
 	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialAmbientTextureIndex);
 
-	if (!matData.textureData.specularMap.empty())
+	writeStartTag(pod::e_materialSpecularColorTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_SPECULAR].empty())
 	{
-		writeStartTag(pod::e_materialSpecularColorTextureIndex, 4);
 		write4Bytes(m_fileStream, offset);
-		writeEndTag(pod::e_materialSpecularColorTextureIndex);
 		++offset;
 	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialSpecularColorTextureIndex);
+
+	writeStartTag(pod::e_materialSpecularLevelTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_HEIGHT].empty())
+	{
+		write4Bytes(m_fileStream, offset);
+		++offset;
+	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialSpecularLevelTextureIndex);
+
+	writeStartTag(pod::e_materialBumpMapTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_NORMALS].empty())
+	{
+		write4Bytes(m_fileStream, offset);
+		++offset;
+	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialBumpMapTextureIndex);
+
+	writeStartTag(pod::e_materialEmissiveTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_EMISSIVE].empty())
+	{
+		write4Bytes(m_fileStream, offset);
+		++offset;
+	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialEmissiveTextureIndex);
+
+	writeStartTag(pod::e_materialGlossinessTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_SHININESS].empty())
+	{
+		write4Bytes(m_fileStream, offset);
+		++offset;
+	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialGlossinessTextureIndex);
+
+	writeStartTag(pod::e_materialOpacityTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_OPACITY].empty())
+	{
+		write4Bytes(m_fileStream, offset);
+		++offset;
+	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialOpacityTextureIndex);
+
+	writeStartTag(pod::e_materialReflectionTextureIndex, 4);
+	if (!matData.textureData.texturesMap[aiTextureType_REFLECTION].empty())
+	{
+		write4Bytes(m_fileStream, offset);
+		++offset;
+	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialReflectionTextureIndex);
+
+	// refraction map not supported
+	writeStartTag(pod::e_materialRefractionTextureIndex, 4);
+	write4Bytes(m_fileStream, emptyTextureIndex);
+	writeEndTag(pod::e_materialRefractionTextureIndex);
 
 	// Ambient Color
 	float32	ambientColor[3] = { matData.ambientColor.r, matData.ambientColor.g, matData.ambientColor.b };
@@ -780,42 +849,8 @@ void PODWriter::writeTextureBlock(uint index)
 	// will have a Length of zero. 
 	writeStartTag(pod::e_sceneTexture, 0);
 
-	// Texture Index
-	// calculate the index offset
-	uint offset = 0;
-	std::string path;
-	for (uint i = 0; i <= index; ++i)
-	{
-		if (!m_modelDataVec[i]->materialData.textureData.diffuseMap.empty())
-		{
-			if (index == offset)
-			{
-				path = m_modelDataVec[i]->materialData.textureData.diffuseMap;
-				break;
-			}
-			++offset;
-		}
-		if (!m_modelDataVec[i]->materialData.textureData.normalMap.empty())
-		{
-			if (index == offset)
-			{
-				path = m_modelDataVec[i]->materialData.textureData.normalMap;
-				break;
-			}
-			++offset;
-		}
-		if (!m_modelDataVec[i]->materialData.textureData.specularMap.empty())
-		{
-			if (index == offset)
-			{
-				path = m_modelDataVec[i]->materialData.textureData.normalMap;
-				break;
-			}
-			++offset;
-		}
-	}
-
 	// Texture Name (file path not included as stated in the document)
+	std::string path = m_modelLoader.getTexture(index);
 	const size_t last_slash_idx = path.rfind('/');
 	if (std::string::npos != last_slash_idx)
 	{

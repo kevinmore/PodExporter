@@ -17,9 +17,7 @@ struct MeshData
 
 struct TextureData
 {
-	string diffuseMap, normalMap, specularMap;
-
-	map<aiTextureType, string> textureMap;
+	map<aiTextureType, string> texturesMap;
 };
 
 struct MaterialData
@@ -84,8 +82,10 @@ public:
 	vector<Bone>& getBoneList() { return m_BoneInfo; }
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
 	uint getNumNodes() { return m_Nodes.size();  }
+	uint getNumTextures() { return m_texturePaths.size(); }
 	double getAnimationDuration() { return m_animationDuration; }
 	const aiScene* getScene() { return m_aiScene; }
+	string& getTexture(uint index) { return m_texturePaths[index]; }
 
 private:
 	/*
@@ -128,6 +128,7 @@ private:
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<VertexBoneData> m_Bones;
+	vector<string> m_texturePaths;
 	uint m_NumBones;
 	vector<Bone> m_BoneInfo;
 	mat4 m_GlobalInverseTransform;

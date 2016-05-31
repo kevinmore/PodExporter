@@ -11,6 +11,7 @@ void ModelLoader::clear()
 	m_tangents.clear();
 	m_indices.clear();
 	m_Bones.clear();
+	m_texturePaths.clear();
 
 	// delete the nodes that we created for the sub meshes
 	for each (aiNode* var in m_Nodes)
@@ -528,16 +529,16 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	// process all texture types
 	vector<aiTextureType> textureTypes;
 	if (material->GetTextureCount(aiTextureType_DIFFUSE)) textureTypes.push_back(aiTextureType_DIFFUSE);
-	if (material->GetTextureCount(aiTextureType_SPECULAR)) textureTypes.push_back(aiTextureType_SPECULAR);
 	if (material->GetTextureCount(aiTextureType_AMBIENT)) textureTypes.push_back(aiTextureType_AMBIENT);
-	if (material->GetTextureCount(aiTextureType_EMISSIVE)) textureTypes.push_back(aiTextureType_EMISSIVE);
+	if (material->GetTextureCount(aiTextureType_SPECULAR)) textureTypes.push_back(aiTextureType_SPECULAR);
 	if (material->GetTextureCount(aiTextureType_HEIGHT)) textureTypes.push_back(aiTextureType_HEIGHT);
 	if (material->GetTextureCount(aiTextureType_NORMALS)) textureTypes.push_back(aiTextureType_NORMALS);
+	if (material->GetTextureCount(aiTextureType_EMISSIVE)) textureTypes.push_back(aiTextureType_EMISSIVE);
 	if (material->GetTextureCount(aiTextureType_SHININESS)) textureTypes.push_back(aiTextureType_SHININESS);
 	if (material->GetTextureCount(aiTextureType_OPACITY)) textureTypes.push_back(aiTextureType_OPACITY);
-	if (material->GetTextureCount(aiTextureType_DISPLACEMENT)) textureTypes.push_back(aiTextureType_DISPLACEMENT);
-	if (material->GetTextureCount(aiTextureType_LIGHTMAP)) textureTypes.push_back(aiTextureType_LIGHTMAP);
 	if (material->GetTextureCount(aiTextureType_REFLECTION)) textureTypes.push_back(aiTextureType_REFLECTION);
+	//if (material->GetTextureCount(aiTextureType_DISPLACEMENT)) textureTypes.push_back(aiTextureType_DISPLACEMENT);
+	//if (material->GetTextureCount(aiTextureType_LIGHTMAP)) textureTypes.push_back(aiTextureType_LIGHTMAP);
 	//if(material->GetTextureCount(aiTextureType_UNKNOWN)     ) textureFeatures .push_back( aiTextureType_UNKNOWN);
 
 	for each(aiTextureType type in textureTypes)
@@ -552,18 +553,8 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 			// relative path
 			string texturePath = path.data;
 
-			if (type == aiTextureType_DIFFUSE)
-			{
-				data.diffuseMap = texturePath;
-			}
-			else if (type == aiTextureType_NORMALS)
-			{
-				data.normalMap = texturePath;
-			}
-			else if (type == aiTextureType_SPECULAR)
-			{
-				data.specularMap = texturePath;
-			}
+			data.texturesMap[type] = texturePath;
+			m_texturePaths.push_back(texturePath);
 		}
 	}
 
