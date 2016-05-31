@@ -11,6 +11,17 @@ void ModelLoader::clear()
 	m_tangents.clear();
 	m_indices.clear();
 	m_Bones.clear();
+
+	// delete the nodes that we created for the sub meshes
+	for each (aiNode* var in m_Nodes)
+	{
+		std::string name = std::string(var->mName.C_Str());
+		if (name.find("-submesh") != std::string::npos)
+		{
+			SAFE_DELETE(var);
+		}
+	}
+	m_subMeshNodes.clear();
 	m_Nodes.clear();
 }
 
@@ -90,6 +101,32 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
 
 		modelDataVector[i] = ModelDataPtr(md);
+
+		aiNode* meshNode = getNodeFromMeshName(md->meshData.name.c_str(), m_subMeshNodes);
+		
+		if (!meshNode)
+		{
+			meshNode = m_aiScene->mRootNode->FindNode(md->meshData.name.c_str());
+		}
+
+		m_Nodes.push_back(meshNode);
+	}
+
+	// parse nodes
+	parseNoneMeshNodes(m_aiScene->mRootNode);
+	for (uint i = 0; i < m_Nodes.size(); ++i)
+	{
+		int parentIdx = -1;
+		for (int j = 0; j < (int)m_Nodes.size(); ++j)
+		{
+			if (m_Nodes[j] == m_Nodes[i]->mParent)
+			{
+				parentIdx = j;
+				break;
+			}
+		}
+	
+		cout << "\n" << i << " " << parentIdx << " " << m_Nodes[i]->mName.C_Str();
 	}
 
 	// generate the skeleton of the model
@@ -106,24 +143,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 		// print out the skeleton
 		//m_skeleton->dumpSkeleton(skeleton_root, 0);
-	}
-
-	// parse nodes
-	parseMeshNodes(m_aiScene->mRootNode);
-	parseOtherNodes(m_aiScene->mRootNode);
-	for (uint i = 0; i < m_Nodes.size(); ++i)
-	{
-		int parentIdx = -1;
-		for (int j = 0; j < (int)m_Nodes.size(); ++j)
-		{
-			if (m_Nodes[j] == m_Nodes[i]->mParent)
-			{
-				parentIdx = j;
-				break;
-			}
-		}
-
-		cout << "\n" << i << " " << parentIdx << " " << m_Nodes[i]->mName.C_Str();
 	}
 
 	cout << "Loaded " << fileName << endl;
@@ -214,9 +233,15 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 				// create mesh nodes
 				aiNode* meshNode = new aiNode(result);
 				meshNode->mNumMeshes = 1;
-				meshNode->mParent = pNode->mParent;
+				aiNode* parent = pNode->mParent;
+				meshNode->mParent = parent;
 				meshNode->mMeshes = new unsigned int[1]{ meshIndex };
-				m_Nodes.push_back(meshNode);
+
+				// register this new node
+				//++parent->mNumChildren;
+				//parent->mChildren[parent->mNumChildren - 1] = meshNode;
+
+				m_subMeshNodes.push_back(meshNode);
 			}
 			else
 			{
@@ -386,6 +411,11 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 	MaterialData data;
 	//data.name = m_fileName + "/material_" + string::number(index);
 	data.name = string(name.C_Str());
+	const size_t last_idx = data.name.rfind("-material");
+	if (std::string::npos != last_idx)
+	{
+		data.name = data.name.substr(0, last_idx);
+	}
 
 	color4D ambientColor(0.1f, 0.1f, 0.1f, 1.0f);
 	color4D diffuseColor(0.8f, 0.8f, 0.8f, 1.0f);
@@ -497,17 +527,17 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 
 	// process all texture types
 	vector<aiTextureType> textureTypes;
-	if (material->GetTextureCount(aiTextureType_DIFFUSE)) textureTypes .push_back( aiTextureType_DIFFUSE);
-	if (material->GetTextureCount(aiTextureType_SPECULAR)) textureTypes .push_back( aiTextureType_SPECULAR);
-	if (material->GetTextureCount(aiTextureType_AMBIENT)) textureTypes .push_back( aiTextureType_AMBIENT);
-	if (material->GetTextureCount(aiTextureType_EMISSIVE)) textureTypes .push_back( aiTextureType_EMISSIVE);
-	if (material->GetTextureCount(aiTextureType_HEIGHT)) textureTypes .push_back( aiTextureType_HEIGHT);
-	if (material->GetTextureCount(aiTextureType_NORMALS)) textureTypes .push_back( aiTextureType_NORMALS);
-	if (material->GetTextureCount(aiTextureType_SHININESS)) textureTypes .push_back( aiTextureType_SHININESS);
-	if (material->GetTextureCount(aiTextureType_OPACITY)) textureTypes .push_back( aiTextureType_OPACITY);
-	if (material->GetTextureCount(aiTextureType_DISPLACEMENT)) textureTypes .push_back( aiTextureType_DISPLACEMENT);
-	if (material->GetTextureCount(aiTextureType_LIGHTMAP)) textureTypes .push_back( aiTextureType_LIGHTMAP);
-	if (material->GetTextureCount(aiTextureType_REFLECTION)) textureTypes .push_back( aiTextureType_REFLECTION);
+	if (material->GetTextureCount(aiTextureType_DIFFUSE)) textureTypes.push_back(aiTextureType_DIFFUSE);
+	if (material->GetTextureCount(aiTextureType_SPECULAR)) textureTypes.push_back(aiTextureType_SPECULAR);
+	if (material->GetTextureCount(aiTextureType_AMBIENT)) textureTypes.push_back(aiTextureType_AMBIENT);
+	if (material->GetTextureCount(aiTextureType_EMISSIVE)) textureTypes.push_back(aiTextureType_EMISSIVE);
+	if (material->GetTextureCount(aiTextureType_HEIGHT)) textureTypes.push_back(aiTextureType_HEIGHT);
+	if (material->GetTextureCount(aiTextureType_NORMALS)) textureTypes.push_back(aiTextureType_NORMALS);
+	if (material->GetTextureCount(aiTextureType_SHININESS)) textureTypes.push_back(aiTextureType_SHININESS);
+	if (material->GetTextureCount(aiTextureType_OPACITY)) textureTypes.push_back(aiTextureType_OPACITY);
+	if (material->GetTextureCount(aiTextureType_DISPLACEMENT)) textureTypes.push_back(aiTextureType_DISPLACEMENT);
+	if (material->GetTextureCount(aiTextureType_LIGHTMAP)) textureTypes.push_back(aiTextureType_LIGHTMAP);
+	if (material->GetTextureCount(aiTextureType_REFLECTION)) textureTypes.push_back(aiTextureType_REFLECTION);
 	//if(material->GetTextureCount(aiTextureType_UNKNOWN)     ) textureFeatures .push_back( aiTextureType_UNKNOWN);
 
 	for each(aiTextureType type in textureTypes)
@@ -525,12 +555,10 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 			if (type == aiTextureType_DIFFUSE)
 			{
 				data.diffuseMap = texturePath;
-				m_modelFeatures.hasColorMap = true;
 			}
 			else if (type == aiTextureType_NORMALS)
 			{
 				data.normalMap = texturePath;
-				m_modelFeatures.hasNormalMap = true;
 			}
 			else if (type == aiTextureType_SPECULAR)
 			{
@@ -542,20 +570,7 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	return data;
 }
 
-void ModelLoader::parseMeshNodes(aiNode* pNode)
-{
-	if (!pNode) return;
-
-	if(pNode->mNumMeshes == 1)
-		m_Nodes.push_back(pNode);
-
-	for (size_t i = 0; i < pNode->mNumChildren; ++i)
-	{
-		parseMeshNodes(pNode->mChildren[i]);
-	}
-}
-
-void ModelLoader::parseOtherNodes(aiNode* pNode)
+void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
 {
 	if (!pNode) return;
 
@@ -564,6 +579,19 @@ void ModelLoader::parseOtherNodes(aiNode* pNode)
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
-		parseOtherNodes(pNode->mChildren[i]);
+		parseNoneMeshNodes(pNode->mChildren[i]);
 	}
+}
+
+aiNode* ModelLoader::getNodeFromMeshName(const char* meshName, vector<aiNode*>& source)
+{
+	for each (aiNode* var in source)
+	{
+		if (!strcmp(meshName, var->mName.C_Str()))
+		{
+			return var;
+		}
+	}
+
+	return NULL;
 }

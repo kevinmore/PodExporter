@@ -18,6 +18,8 @@ struct MeshData
 struct TextureData
 {
 	string diffuseMap, normalMap, specularMap;
+
+	map<aiTextureType, string> textureMap;
 };
 
 struct MaterialData
@@ -96,28 +98,13 @@ private:
 	void prepareVertexContainers(unsigned int index, const aiMesh* mesh);
 	void generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
-
-	void parseMeshNodes(aiNode* pNode);
-	void parseOtherNodes(aiNode* pNode);
+	aiNode* getNodeFromMeshName(const char* meshName, vector<aiNode*>& source);
+	void parseNoneMeshNodes(aiNode* pNode);
 
 	/*
 	*	Clean up
 	*/
 	void clear();
-
-	/*
-	*	Model Features
-	*/
-	struct ModelFeatures
-	{
-		bool hasColorMap;
-		bool hasNormalMap;
-		ModelFeatures()
-		{
-			hasColorMap = false;
-			hasNormalMap = false;
-		}
-	} m_modelFeatures;
 
 	/*
 	*	Vertex Data Containers
@@ -139,6 +126,7 @@ private:
 	Skeleton* m_skeleton;
 	map<string, uint> m_BoneMapping; // maps a bone name to its index
 	vector<aiNode*> m_Nodes;
+	vector<aiNode*> m_subMeshNodes;
 	vector<VertexBoneData> m_Bones;
 	uint m_NumBones;
 	vector<Bone> m_BoneInfo;

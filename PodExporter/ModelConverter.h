@@ -26,10 +26,10 @@ namespace VEEMEE
 			exporter.setModels(models);
 
 			string nameWithoutExtension;
-			const size_t last_slash_idx = fileName.rfind('.');
-			if (std::string::npos != last_slash_idx)
+			const size_t last_idx = fileName.rfind('.');
+			if (std::string::npos != last_idx)
 			{
-				nameWithoutExtension = fileName.substr(0, last_slash_idx);
+				nameWithoutExtension = fileName.substr(0, last_idx);
 			}
 
 			exporter.exportModel(nameWithoutExtension + ".pod", false);

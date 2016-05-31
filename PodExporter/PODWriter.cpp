@@ -338,7 +338,7 @@ void PODWriter::writeSceneBlock()
 	writeEndTag(pod::e_sceneClearColor);
 
 	// Ambient Colour 
-	float32	ambientColor[3] = { 0.f, 0.f, 0.f };
+	float32	ambientColor[3] = { 0.5f, 0.5f, 0.5f };
 	writeStartTag(pod::e_sceneAmbientColor, 3 * sizeof(float32));
 	write4ByteArray(m_fileStream, &ambientColor[0], 3);
 	writeEndTag(pod::e_sceneAmbientColor);
@@ -480,13 +480,19 @@ void PODWriter::writeMaterialBlock(uint index)
 			++offset;
 	}
 
+	int32 emptyTextureIndex = -1;
+
+	writeStartTag(pod::e_materialDiffuseTextureIndex, 4);
 	if (!matData.textureData.diffuseMap.empty())
 	{
-		writeStartTag(pod::e_materialDiffuseTextureIndex, 4);
 		write4Bytes(m_fileStream, offset);
-		writeEndTag(pod::e_materialDiffuseTextureIndex);
 		++offset;
 	}
+	else
+	{
+		write4Bytes(m_fileStream, emptyTextureIndex);
+	}
+	writeEndTag(pod::e_materialDiffuseTextureIndex);
 
 	if (!matData.textureData.normalMap.empty())
 	{
@@ -663,7 +669,8 @@ void PODWriter::writeNodeBlock(uint index)
 
 	// Node Index
 	writeStartTag(pod::e_nodeIndex, 4);
-	write4Bytes(m_fileStream, index);
+	int32 objectIndex = node->mNumMeshes > 0 ? index : -1;
+	write4Bytes(m_fileStream, objectIndex);
 	writeEndTag(pod::e_nodeIndex);
 
 	// Node Name
