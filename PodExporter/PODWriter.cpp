@@ -773,6 +773,10 @@ void PODWriter::writeMeshBlock(uint index)
 		writeEndTag(pod::e_meshBoneIndexList);
 	}
 
+	writeStartTag(pod::e_meshUnpackMatrix, 4 * 16);
+	writeBytes(m_fileStream, meshData.unpackMatrix.a1, 4 * 16);
+	writeEndTag(pod::e_meshUnpackMatrix);
+
 	writeEndTag(pod::e_sceneMesh);
 }
 

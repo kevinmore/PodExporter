@@ -12,6 +12,7 @@ struct MeshData
 	unsigned int numIndices;
 	unsigned int baseVertex;
 	unsigned int baseIndex;
+	mat4 unpackMatrix;
 };
 
 
@@ -40,8 +41,6 @@ struct ModelData
 {
 	MeshData     meshData;
 	MaterialData materialData;
-	bool hasAnimation;
-	float animationDuration;
 };
 
 typedef shared_ptr<MeshData> MeshDataPtr;
@@ -80,7 +79,6 @@ public:
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
 	uint getNumNodes() { return m_Nodes.size();  }
 	uint getNumTextures() { return m_texturePaths.size(); }
-	double getAnimationDuration() { return m_animationDuration; }
 	const aiScene* getScene() { return m_aiScene; }
 	string& getTexture(uint index) { return m_texturePaths[index]; }
 
@@ -88,8 +86,8 @@ private:
 	/*
 	*	Methods to process the model file
 	*/
-	MeshData     loadMesh(unsigned int index, unsigned int numVertices, unsigned int numIndices, const aiMesh* mesh);
-	MaterialData loadMaterial(unsigned int index, const aiMaterial* material);
+	MeshData     loadMesh(unsigned int index, unsigned int baseVertex, unsigned int baseIndex);
+	MaterialData loadMaterial(const aiMaterial* material);
 	TextureData  loadTexture(const aiMaterial* material);
 	void loadBones(uint MeshIndex, const aiMesh* paiMesh);
 	void prepareVertexContainers(unsigned int index, const aiMesh* mesh);
@@ -97,6 +95,7 @@ private:
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNodeFromMeshName(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);
+	mat4 calculateGlobalTransform(aiNode* pNode);
 
 	/*
 	*	Clean up
@@ -107,7 +106,6 @@ private:
 	*	Vertex Data Containers
 	*/
 	vector<vec3> m_positions;
-	vector<color4D> m_colors;
 	vector<vec2> m_texCoords;
 	vector<vec3> m_normals;
 	vector<vec3> m_tangents;
@@ -129,6 +127,5 @@ private:
 	uint m_NumBones;
 	vector<Bone> m_BoneInfo;
 	mat4 m_GlobalInverseTransform;
-	double m_animationDuration;
 };
 

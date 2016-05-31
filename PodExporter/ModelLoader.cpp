@@ -5,7 +5,6 @@
 void ModelLoader::clear()
 {
 	m_positions.clear();
-	m_colors.clear();
 	m_texCoords.clear();
 	m_normals.clear();
 	m_tangents.clear();
@@ -61,23 +60,19 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation.Inverse();
 
 	uint numVertices = 0, numIndices = 0, numFaces = 0;
-
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
 	{
 		numVertices += m_aiScene->mMeshes[i]->mNumVertices;
 		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
 		numFaces += m_aiScene->mMeshes[i]->mNumFaces;
 	}
-
 	m_positions.reserve(numVertices);
-	m_colors.reserve(numVertices);
 	m_normals.reserve(numVertices);
 	m_texCoords.reserve(numVertices);
 	m_tangents.reserve(numVertices);
 	m_indices.reserve(numIndices);
 	m_Bones.resize(numVertices);
 
-	m_animationDuration = 0;
 	numVertices = 0;
 	numIndices = 0;
 	m_NumBones = 0;
@@ -88,18 +83,12 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	{
 		ModelDataPtr md(new ModelData());
 
-		md->meshData = loadMesh(i, numVertices, numIndices, m_aiScene->mMeshes[i]);
-
-		md->materialData = loadMaterial(i, m_aiScene->mMaterials[m_aiScene->mMeshes[i]->mMaterialIndex]);
-
-		md->hasAnimation = m_aiScene->HasAnimations();
-
-		// calculate the animation duration in seconds
-		if (m_aiScene->HasAnimations()) md->animationDuration = (float)m_aiScene->mAnimations[0]->mDuration;
-		else md->animationDuration = 0.0f;
+		md->meshData = loadMesh(i, numVertices, numIndices);
+		md->materialData = loadMaterial(m_aiScene->mMaterials[m_aiScene->mMeshes[i]->mMaterialIndex]);
 
 		numVertices += m_aiScene->mMeshes[i]->mNumVertices;
 		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
+		numFaces += m_aiScene->mMeshes[i]->mNumFaces;
 
 		modelDataVector[i] = ModelDataPtr(md);
 
@@ -110,25 +99,13 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			meshNode = m_aiScene->mRootNode->FindNode(md->meshData.name.c_str());
 		}
 
+		md->meshData.unpackMatrix = calculateGlobalTransform(meshNode);
+
 		m_Nodes.push_back(meshNode);
 	}
 
-	// parse nodes
+	// parse other nodes, this step makes sure the mesh nodes are in the front
 	parseNoneMeshNodes(m_aiScene->mRootNode);
-	for (uint i = 0; i < m_Nodes.size(); ++i)
-	{
-		int parentIdx = -1;
-		for (int j = 0; j < (int)m_Nodes.size(); ++j)
-		{
-			if (m_Nodes[j] == m_Nodes[i]->mParent)
-			{
-				parentIdx = j;
-				break;
-			}
-		}
-	
-		cout << "\n" << i << " " << parentIdx << " " << m_Nodes[i]->mName.C_Str();
-	}
 
 	// generate the skeleton of the model
 	// specify the root bone
@@ -152,8 +129,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		cout << "Contains " << m_NumBones << " bones. ";
 	if (m_aiScene->HasAnimations())
 	{
-		m_animationDuration = m_aiScene->mAnimations[0]->mDuration;
-		cout << "Contains " << m_animationDuration << " seconds animation. ";
+		cout << "Contains " << m_aiScene->mAnimations[0]->mDuration << " seconds animation. ";
 	}
 
 	/*
@@ -269,7 +245,6 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh)
 {
 	const vec3 zero3D(0.0f, 0.0f, 0.0f);
-	const color4D  zeroColor(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Populate the vertex attribute vectors
 	for (uint i = 0; i < mesh->mNumVertices; ++i)
@@ -278,13 +253,11 @@ void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh
 		vec3 texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : zero3D;
 		vec3 normal = mesh->HasNormals() ? mesh->mNormals[i] : zero3D;
 		vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[i] : zero3D;
-		color4D color = mesh->HasVertexColors(0) ? mesh->mColors[0][i] : zeroColor;
 
 		m_positions.push_back(pos);
 		m_texCoords.push_back(vec2(texCoord.x, texCoord.y));
 		m_normals.push_back(normal);
 		m_tangents.push_back(tangent);
-		m_colors.push_back(color);
 	}
 
 	if (mesh->HasBones()) loadBones(index, mesh);
@@ -295,11 +268,14 @@ void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh
 	{
 		const aiFace& face = mesh->mFaces[i];
 
+// 		for (uint j = 0; j < face.mNumIndices; ++j)
+// 		{
+// 			m_indices.push_back((uint16)face.mIndices[j]);
+// 		}
+
 		if (face.mNumIndices != 3)
 		{
-			// Unsupported modes : GL_POINTS / GL_LINES / GL_POLYGON
-			cout << "Unsupported number of indices per face " << face.mNumIndices;
-			break;
+			cout << "Unsupported number of indices per face " << face.mNumIndices << endl;
 		}
 		else
 		{
@@ -382,27 +358,24 @@ void ModelLoader::generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat
 	}
 }
 
-MeshData ModelLoader::loadMesh(unsigned int index, unsigned int numVertices, unsigned int numIndices, const aiMesh* mesh)
+MeshData ModelLoader::loadMesh(unsigned int index, unsigned int baseVertex, unsigned int baseIndex)
 {
 	MeshData data;
-
-// 	data.name = mesh->mName.length > 0
-// 		? m_fileName + "/mesh_" + mesh->mName.C_Str()
-// 		: m_fileName + "/mesh_" + (char)index;
+	aiMesh* mesh = m_aiScene->mMeshes[index];
 
 	data.name = getMeshNameFromNode(index, m_aiScene->mRootNode);
 	data.numVertices = mesh->mNumVertices;
 	data.numFaces = mesh->mNumFaces;
 	data.numIndices = mesh->mNumFaces * 3;
-	data.baseVertex = numVertices;
-	data.baseIndex = numIndices;
+	data.baseVertex = baseVertex;
+	data.baseIndex = baseIndex;
 
 	prepareVertexContainers(index, mesh);
 
 	return data;
 }
 
-MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* material)
+MaterialData ModelLoader::loadMaterial(const aiMaterial* material)
 {
 	assert(material != nullptr);
 
@@ -410,7 +383,6 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 	material->Get(AI_MATKEY_NAME, name);
 
 	MaterialData data;
-	//data.name = m_fileName + "/material_" + string::number(index);
 	data.name = string(name.C_Str());
 	const size_t last_idx = data.name.rfind("-material");
 	if (std::string::npos != last_idx)
@@ -558,4 +530,16 @@ aiNode* ModelLoader::getNodeFromMeshName(const char* meshName, vector<aiNode*>& 
 	}
 
 	return NULL;
+}
+
+mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)
+{
+	mat4 result;
+	while (pNode->mParent)
+	{
+		result = pNode->mParent->mTransformation * result;
+		pNode = pNode->mParent;
+	}
+
+	return result;
 }
