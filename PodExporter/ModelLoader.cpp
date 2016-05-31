@@ -421,24 +421,18 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 	color4D ambientColor(0.1f, 0.1f, 0.1f, 1.0f);
 	color4D diffuseColor(0.8f, 0.8f, 0.8f, 1.0f);
 	color4D specularColor(0.0f, 0.0f, 0.0f, 1.0f);
-	color4D emissiveColor(0.0f, 0.0f, 0.0f, 1.0f);
 	data.ambientColor = ambientColor;
 	data.diffuseColor = diffuseColor;
 	data.specularColor = specularColor;
-	data.emissiveColor = emissiveColor;
 
 	int blendMode;
 	data.blendMode = -1;
 
-	int twoSided = 1;
-	data.twoSided = 1;
-
 	float opacity = 1.0f;
+	data.opacity = 1.0f;
 
 	float shininess = 10.0f;
 	data.shininess = 10.0f;
-	float shininessStrength = 0.0f;
-	data.shininessStrength = 0.0f;
 
 	if (material->Get(AI_MATKEY_COLOR_AMBIENT, ambientColor) == AI_SUCCESS)
 	{
@@ -455,30 +449,15 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 		data.specularColor = specularColor;
 	}
 
-	if (material->Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor) == AI_SUCCESS)
-	{
-		data.emissiveColor = emissiveColor;
-	}
-
-	if (material->Get(AI_MATKEY_TWOSIDED, twoSided) == AI_SUCCESS)
-	{
-		data.twoSided = twoSided;
-	}
-
 	if (material->Get(AI_MATKEY_OPACITY, opacity) == AI_SUCCESS)
 	{
 		data.ambientColor.a = opacity;
 		data.diffuseColor.a = opacity;
 		data.specularColor.a = opacity;
-		data.emissiveColor.a = opacity;
+		data.opacity = opacity;
 
 		if (opacity < 1.0f)
 		{
-			data.alphaBlending = true;
-
-			// Activate backface culling allows to avoid
-			// cull artifacts when alpha blending is activated
-			data.twoSided = 1;
 
 			if (material->Get(AI_MATKEY_BLEND_FUNC, blendMode) == AI_SUCCESS)
 			{
@@ -490,7 +469,6 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 		}
 		else
 		{
-			data.alphaBlending = false;
 			data.blendMode = -1;
 		}
 	}
@@ -498,11 +476,6 @@ MaterialData ModelLoader::loadMaterial(unsigned int index, const aiMaterial* mat
 	if (material->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS)
 	{
 		data.shininess = shininess;
-	}
-
-	if (material->Get(AI_MATKEY_SHININESS_STRENGTH, shininessStrength) == AI_SUCCESS)
-	{
-		data.shininessStrength = shininessStrength;
 	}
 
 	// process the textures

@@ -259,18 +259,6 @@ bool PODWriter::writeAllAssets()
 	writeByteArray(m_fileStream, pod::c_PODFormatVersion, pod::c_PODFormatVersionLength);
 	writeEndTag(pod::PODFormatVersion);
 
-	// write export options (mock up)
-	std::string options = "bFlipTextureV=0\nbIndexed=1\nbInterleaved=1\nbSortVertices=1\nbTangentSpace=0\nbExportAnimations=0\nbIndexAnimations=1\nbExportGeometry=1\nbExportMatrices=0\nbExportMappingChannels=1\nbExportMaterials=1\nbExportSkin=0\nbInvertTransparency=0\nbExportModelSpace=1\nbMerge=0\nbUseCustomOptSettings=0\nbExportUserData=0\nbUnpackMatrix=0\nbExportBoneGeometry=0\nbAlignData=1\nbDisplayInShaman=0\nbUsePostExportCL=0\nfTangentSpaceVtxSplit=0.00\neExpFormat=0\ncS=2\neTriSort=1\nePrimType=0\nsClPostTarget=\nsClPostArgs=\nsClPostCWD=\nsPathToShaman=\nsMergeSrc=\nsScriptFile=\nuiStaticFrame=0\nuiBoneLimit=9\nuiPadDataTo=4\nuiTSUseUVW=0\nsVcOptPos.bExport=1\nsVcOptPos.eType=1\nsVcOptPos.nEnable=1196167\nsVcOptNor.bExport=1\nsVcOptNor.eType=1\nsVcOptNor.nEnable=1196167\nsVcOptTan.bExport=1\nsVcOptTan.eType=1\nsVcOptTan.nEnable=1196167\nsVcOptBin.bExport=1\nsVcOptBin.eType=1\nsVcOptBin.nEnable=1196167\nsVcOptCol.bExport=0\nsVcOptCol.eType=5\nsVcOptCol.nEnable=1198095\nsVcOptBoneInd.bExport=1\nsVcOptBoneInd.eType=10\nsVcOptBoneInd.nEnable=1198095\nsVcOptBoneWt.bExport=1\nsVcOptBoneWt.eType=1\nsVcOptBoneWt.nEnable=1198095\npsVcOptUVW[0].bExport=1\npsVcOptUVW[0].eType=1\npsVcOptUVW[0].nEnable=1056901\npsVcOptUVW[1].bExport=0\npsVcOptUVW[1].eType=1\npsVcOptUVW[1].nEnable=1179779\npsVcOptUVW[2].bExport=0\npsVcOptUVW[2].eType=1\npsVcOptUVW[2].nEnable=1179779\npsVcOptUVW[3].bExport=0\npsVcOptUVW[3].eType=1\npsVcOptUVW[3].nEnable=1179779\npsVcOptUVW[4].bExport=0\npsVcOptUVW[4].eType=1\npsVcOptUVW[4].nEnable=1179779\npsVcOptUVW[5].bExport=0\npsVcOptUVW[5].eType=1\npsVcOptUVW[5].nEnable=1179779\npsVcOptUVW[6].bExport=0\npsVcOptUVW[6].eType=1\npsVcOptUVW[6].nEnable=1179779\npsVcOptUVW[7].bExport=0\npsVcOptUVW[7].eType=1\npsVcOptUVW[7].nEnable=1179779\n";
-	writeStartTag(pod::ExportOptions, options.length() + 1);
-	writeByteArrayFromeString(m_fileStream, options);
-	writeEndTag(pod::ExportOptions);
-
-	// write history (mock up)
-	std::string history = "PVRGeoPOD 2.17.1 | 16.1@3959323";
-	writeStartTag(pod::FileHistory, history.length() + 1);
-	writeByteArrayFromeString(m_fileStream, history);
-	writeEndTag(pod::FileHistory);
-
 	// write scene block
 	// a block that contains only further nested blocks between its Start and End tags 
 	// will have a Length of zero. 
@@ -579,6 +567,11 @@ void PODWriter::writeMaterialBlock(uint index)
 	write4Bytes(m_fileStream, emptyTextureIndex);
 	writeEndTag(pod::e_materialRefractionTextureIndex);
 
+	//Opacity
+	writeStartTag(pod::e_materialOpacity, 4);
+	write4Bytes(m_fileStream, matData.opacity);
+	writeEndTag(pod::e_materialOpacity);
+
 	// Ambient Color
 	float32	ambientColor[3] = { matData.ambientColor.r, matData.ambientColor.g, matData.ambientColor.b };
 	writeStartTag(pod::e_materialAmbientColor, 3 * sizeof(float32));
@@ -602,6 +595,65 @@ void PODWriter::writeMaterialBlock(uint index)
 	write4Bytes(m_fileStream, matData.shininess);
 	writeEndTag(pod::e_materialShininess);
 
+	// Blend Function
+	uint32 blendFuncSource, blendFuncDest, blendOperation;
+	switch (matData.blendMode)
+	{
+	case aiBlendMode_Default:
+		blendFuncSource = assets::Model::Material::BlendFuncSrcAlpha;
+		blendFuncDest = assets::Model::Material::BlendFuncOneMinusDstAlpha;
+		blendOperation = assets::Model::Material::BlendOpSubtract;
+		break;
+
+	case aiBlendMode_Additive:
+		blendFuncSource = assets::Model::Material::BlendFuncOne;
+		blendFuncDest = assets::Model::Material::BlendFuncOne;
+		blendOperation = assets::Model::Material::BlendOpAdd;
+		break;
+
+	default:
+		blendFuncSource = assets::Model::Material::BlendFuncOne;
+		blendFuncDest = assets::Model::Material::BlendFuncZero;
+		blendOperation = assets::Model::Material::BlendOpAdd;
+		break;
+	}
+
+	// RGBA
+	writeStartTag(pod::e_materialBlendingRGBSrc, 4);
+	write4Bytes(m_fileStream, blendFuncSource);
+	writeEndTag(pod::e_materialBlendingRGBSrc);
+
+	writeStartTag(pod::e_materialBlendingAlphaSrc, 4);
+	write4Bytes(m_fileStream, blendFuncSource);
+	writeEndTag(pod::e_materialBlendingAlphaSrc);
+
+	writeStartTag(pod::e_materialBlendingRGBDst, 4);
+	write4Bytes(m_fileStream, blendFuncDest);
+	writeEndTag(pod::e_materialBlendingRGBDst);
+
+	writeStartTag(pod::e_materialBlendingAlphaDst, 4);
+	write4Bytes(m_fileStream, blendFuncDest);
+	writeEndTag(pod::e_materialBlendingAlphaDst);
+
+	// Blend Operation
+	writeStartTag(pod::e_materialBlendingRGBOperation, 4);
+	write4Bytes(m_fileStream, blendOperation);
+	writeEndTag(pod::e_materialBlendingRGBOperation);
+
+	writeStartTag(pod::e_materialBlendingAlphaOperation, 4);
+	write4Bytes(m_fileStream, blendOperation);
+	writeEndTag(pod::e_materialBlendingAlphaOperation);
+
+	float32	blendColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	writeStartTag(pod::e_materialBlendingRGBAColor, 4 * sizeof(float32));
+	write4ByteArray(m_fileStream, &blendColor[0], 4);
+	writeEndTag(pod::e_materialBlendingRGBAColor);
+
+	float32	blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	writeStartTag(pod::e_materialBlendingFactorArray, 4 * sizeof(float32));
+	write4ByteArray(m_fileStream, &blendFactor[0], 4);
+	writeEndTag(pod::e_materialBlendingFactorArray);
+
 	writeEndTag(pod::e_sceneMaterial);
 }
 
@@ -624,11 +676,20 @@ void PODWriter::writeMeshBlock(uint index)
 	write4Bytes(m_fileStream, (uint32)meshData.numFaces);
 	writeEndTag(pod::e_meshNumFaces);
 
+	// Num. UVW channels
+	uint32 numUVW = 1;
+	writeStartTag(pod::e_meshNumUVWChannels, 4);
+	write4Bytes(m_fileStream, (uint32)numUVW);
+	writeEndTag(pod::e_meshNumUVWChannels);
+
 	// Vertex List (Position)
 	vector<vec3> positionBuffer = m_modelLoader.getPositionBuffer();
 
 	// Normal List
 	vector<vec3> normalBuffer = m_modelLoader.getNormalBuffer();
+
+	// Tangent List
+	vector<vec3> tangentBuffer = m_modelLoader.getTangetBuffer();
 
 	// UVW List
 	vector<vec2> uvBuffer = m_modelLoader.getUVBuffer();
@@ -637,15 +698,16 @@ void PODWriter::writeMeshBlock(uint index)
 	vector<VertexBoneData> boneBuffer = m_modelLoader.getBoneBuffer();
 
 	// Interleaved Data List
-	// Structure: position.xyz + normal.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 52 bytes)
+	// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 64 bytes)
 	uint32 stride = (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations) ?
-		sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0])
-		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(uvBuffer[0]);
+		sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0])
+		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
 	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
 	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
 	{
 		writeBytes(m_fileStream, positionBuffer[i]);
 		writeBytes(m_fileStream, normalBuffer[i]);
+		writeBytes(m_fileStream, tangentBuffer[i]);
 		writeBytes(m_fileStream, uvBuffer[i]);
 		if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
 		{
@@ -705,6 +767,11 @@ void PODWriter::writeMeshBlock(uint index)
 	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
 	offset += DataType::size(DataType::Float32) * 3;
 	writeEndTag(pod::e_meshNormalList);
+
+	writeStartTag(pod::e_meshTangentList, 0);
+	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+	offset += DataType::size(DataType::Float32) * 3;
+	writeEndTag(pod::e_meshTangentList);
 
 	writeStartTag(pod::e_meshUVWList, 0);
 	writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);

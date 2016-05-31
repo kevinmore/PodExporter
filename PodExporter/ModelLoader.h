@@ -27,14 +27,11 @@ struct MaterialData
 	color4D ambientColor;
 	color4D diffuseColor;
 	color4D specularColor;
-	color4D emissiveColor;
 
+	float opacity;
 	float shininess;
-	float shininessStrength;
 
-	int twoSided;
 	int blendMode;
-	bool alphaBlending;
 
 	TextureData textureData;
 };
