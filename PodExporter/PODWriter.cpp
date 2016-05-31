@@ -326,7 +326,7 @@ void PODWriter::writeSceneBlock()
 	writeEndTag(pod::e_sceneClearColor);
 
 	// Ambient Colour 
-	float32	ambientColor[3] = { 0.5f, 0.5f, 0.5f };
+	float32	ambientColor[3] = { 0.f, 0.f, 0.f };
 	writeStartTag(pod::e_sceneAmbientColor, 3 * sizeof(float32));
 	write4ByteArray(m_fileStream, &ambientColor[0], 3);
 	writeEndTag(pod::e_sceneAmbientColor);
@@ -461,9 +461,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialDiffuseTextureIndex);
 
 	writeStartTag(pod::e_materialAmbientTextureIndex, 4);
@@ -473,9 +471,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialAmbientTextureIndex);
 
 	writeStartTag(pod::e_materialSpecularColorTextureIndex, 4);
@@ -485,9 +481,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialSpecularColorTextureIndex);
 
 	writeStartTag(pod::e_materialSpecularLevelTextureIndex, 4);
@@ -497,9 +491,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialSpecularLevelTextureIndex);
 
 	writeStartTag(pod::e_materialBumpMapTextureIndex, 4);
@@ -509,9 +501,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialBumpMapTextureIndex);
 
 	writeStartTag(pod::e_materialEmissiveTextureIndex, 4);
@@ -521,9 +511,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialEmissiveTextureIndex);
 
 	writeStartTag(pod::e_materialGlossinessTextureIndex, 4);
@@ -533,9 +521,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialGlossinessTextureIndex);
 
 	writeStartTag(pod::e_materialOpacityTextureIndex, 4);
@@ -545,9 +531,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialOpacityTextureIndex);
 
 	writeStartTag(pod::e_materialReflectionTextureIndex, 4);
@@ -557,9 +541,7 @@ void PODWriter::writeMaterialBlock(uint index)
 		++offset;
 	}
 	else
-	{
 		write4Bytes(m_fileStream, emptyTextureIndex);
-	}
 	writeEndTag(pod::e_materialReflectionTextureIndex);
 
 	// refraction map not supported
@@ -803,7 +785,7 @@ void PODWriter::writeNodeBlock(uint index)
 	// will have a Length of zero. 
 	writeStartTag(pod::e_sceneNode, 0);
 
-	// Node Index
+	// Node Index (only consider mesh, light and camera)
 	writeStartTag(pod::e_nodeIndex, 4);
 	int32 objectIndex = node->mNumMeshes > 0 ? index : -1;
 	write4Bytes(m_fileStream, objectIndex);
@@ -819,7 +801,7 @@ void PODWriter::writeNodeBlock(uint index)
 	if (node->mNumMeshes == 1)
 	{
 		writeStartTag(pod::e_nodeMaterialIndex, 4);
-		write4Bytes(m_fileStream, node->mMeshes[0]); // need fix
+		write4Bytes(m_fileStream, node->mMeshes[0]);
 		writeEndTag(pod::e_nodeMaterialIndex);
 	}
 
@@ -835,7 +817,7 @@ void PODWriter::writeNodeBlock(uint index)
 		}
 	}
 	writeStartTag(pod::e_nodeParentIndex, 4);
-	write4Bytes(m_fileStream, parentIdx); // need fix
+	write4Bytes(m_fileStream, parentIdx);
 	writeEndTag(pod::e_nodeParentIndex);
 
 	// Node Animation
