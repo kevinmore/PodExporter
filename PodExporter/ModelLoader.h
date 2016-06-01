@@ -93,7 +93,7 @@ private:
 	void prepareVertexContainers(unsigned int index, const aiMesh* mesh);
 	void generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
-	aiNode* getNodeFromMeshName(const char* meshName, vector<aiNode*>& source);
+	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);
 	mat4 calculateGlobalTransform(aiNode* pNode);
 
@@ -124,7 +124,6 @@ private:
 	vector<aiNode*> m_subMeshNodes;
 	vector<VertexBoneData> m_Bones;
 	vector<string> m_texturePaths;
-	uint m_NumBones;
 	vector<Bone> m_BoneInfo;
 	mat4 m_GlobalInverseTransform;
 };

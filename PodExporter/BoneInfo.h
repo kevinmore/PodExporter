@@ -18,7 +18,7 @@ struct VertexBoneData
 		ZERO_MEM(Weights);
 	}
 
-	void AddBoneData(uint BoneID, float Weight)
+	void AddBoneData(uint8_t BoneID, float Weight)
 	{
 		for (uint i = 0; i < ARRAY_SIZE_IN_ELEMENTS(IDs); ++i) {
 			if (Weights[i] == 0.0) {

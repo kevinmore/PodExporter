@@ -414,19 +414,11 @@ void PODWriter::writeMeshBlock(uint index)
 	write4Bytes(m_fileStream, numUVW);
 	writeEndTag(pod::e_meshNumUVWChannels);
 
-	// Vertex List (Position)
+	// Get vertex attributes buffers from the model loader
 	vector<vec3> positionBuffer = m_modelLoader.getPositionBuffer();
-
-	// Normal List
 	vector<vec3> normalBuffer = m_modelLoader.getNormalBuffer();
-
-	// Tangent List
 	vector<vec3> tangentBuffer = m_modelLoader.getTangetBuffer();
-
-	// UV List
 	vector<vec2> uvBuffer = m_modelLoader.getUVBuffer();
-
-	// Bone Weights List
 	vector<VertexBoneData> boneBuffer = m_modelLoader.getBoneBuffer();
 
 	// Interleaved Data List
@@ -434,6 +426,7 @@ void PODWriter::writeMeshBlock(uint index)
 	uint32 stride = (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations) ?
 		sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0])
 		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
+
 	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
 	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
 	{
@@ -494,24 +487,89 @@ void PODWriter::writeMeshBlock(uint index)
 		offset += DataType::size(DataType::UInt8) * 4;
 		writeEndTag(pod::e_meshBoneIndexList);
 
+		// process bones
+		// get the bone ids affecting the vertices of this mesh
+		vector<uint8> boneIds;
+// 		for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
+// 		{
+// 			for (uint j = 0; j < 4; ++j)
+// 			{
+// 				uint8 id = boneBuffer[i].IDs[j];
+// 				// bone id will never be 0, as the mesh nodes are the first ones
+// 				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
+// 					boneIds.push_back(id);
+// 			}
+// 		}
+
+ 		for (uint i = 0; i < currentIndexBuffer.size(); ++i)
+ 		{
+ 			for (uint j = 0; j < 4; ++j)
+ 			{
+ 				uint8 id = boneBuffer[currentIndexBuffer[i] + meshData.baseVertex].IDs[j];
+ 				// bone id will never be 0, as the mesh nodes are the first ones
+ 				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
+ 					boneIds.push_back(id);
+ 			}
+ 		}
+
 		// Max. Num. Bones per Batch 
-		//writeStartTag(pod::e_meshMaxNumBonesPerBatch, 4);
-		//writeEndTag(pod::e_meshMaxNumBonesPerBatch);
+		uint32 batchStride = 9;
+		writeStartTag(pod::e_meshMaxNumBonesPerBatch, 4);
+		write4Bytes(m_fileStream, batchStride);
+		writeEndTag(pod::e_meshMaxNumBonesPerBatch);
 
 		// Num. Bone Batches 
-		//writeStartTag(pod::e_meshNumBoneBatches, 4);
-		//writeEndTag(pod::e_meshNumBoneBatches);
-
-		// Bone Batch Index List 
-		// A list of indices into the "Node" list, each indexed "Node" representing the transformations associated with a single bone. 
-		// (Read via £Bone Index List"). 
-		//writeStartTag(pod::e_meshBoneBatchIndexList, 400);
-		//writeEndTag(pod::e_meshBoneBatchIndexList);
+		uint mod = boneIds.size() % batchStride;
+		uint32 batchesCount = mod > 0 ? boneIds.size() / batchStride + 1 : boneIds.size() / batchStride;
+		writeStartTag(pod::e_meshNumBoneBatches, 4);
+		write4Bytes(m_fileStream, batchesCount);
+		writeEndTag(pod::e_meshNumBoneBatches);
 
 		// Num. Bone Indices per Batch 
 		// A list of integers, each integer representing the number of indices in each batch in the "Bone Batch Index List"
-		//writeStartTag(pod::e_meshNumBoneIndicesPerBatch, 8);
-		//writeEndTag(pod::e_meshNumBoneIndicesPerBatch);
+		uint emptySpaces = batchStride * batchesCount - boneIds.size();
+		vector<uint32> actualBoneCountsList;
+		for (uint i = 0; i < batchesCount; ++i)
+		{
+			actualBoneCountsList.push_back(batchStride);
+		}
+		while (emptySpaces > 0)
+		{
+			for (int i = batchesCount - 1; i >= 0 && emptySpaces > 0; --i)
+			{
+				--actualBoneCountsList[i];
+				--emptySpaces;
+			}
+		}
+
+		writeStartTag(pod::e_meshNumBoneIndicesPerBatch, 4 * batchesCount);
+		write4ByteArray(m_fileStream, &actualBoneCountsList, batchesCount);
+		writeEndTag(pod::e_meshNumBoneIndicesPerBatch);
+
+		// Bone Batch Index List 
+		// A list of indices into the "Node" list, each indexed "Node" representing the transformations associated with a single bone. 
+		// (Read via "Bone Index List"). 
+		vector<vector<uint32>> batches;
+		uint count = 0;
+		for (uint i = 0; i < batchesCount; ++i)
+		{
+			vector<uint32> batch;
+			uint32 actualNum = actualBoneCountsList[i];
+			for (uint j = 0; j < actualNum; ++j)
+			{
+				batch.push_back(boneIds[count++]);
+			}
+			for (uint j = actualNum; j < batchStride; ++j)
+			{
+				// padding with 0
+				batch.push_back(0);
+			}
+
+			batches.push_back(batch);
+		}
+		writeStartTag(pod::e_meshBoneBatchIndexList, 4 * batchStride * batchesCount);
+		write4ByteArray(m_fileStream, &batches, 4 * batchStride * batchesCount);
+		writeEndTag(pod::e_meshBoneBatchIndexList);
 
 		// Bone Offset per Batch
 		// A list of integers, each integer representing the offset into the "Vertex List", 

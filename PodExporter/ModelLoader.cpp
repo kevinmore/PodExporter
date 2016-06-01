@@ -75,7 +75,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	numVertices = 0;
 	numIndices = 0;
-	m_NumBones = 0;
 	vector<ModelDataPtr> modelDataVector;
 	modelDataVector.resize(m_aiScene->mNumMeshes);
 
@@ -92,7 +91,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 		modelDataVector[i] = ModelDataPtr(md);
 
-		aiNode* meshNode = getNodeFromMeshName(md->meshData.name.c_str(), m_subMeshNodes);
+		aiNode* meshNode = getNode(md->meshData.name.c_str(), m_subMeshNodes);
 		
 		if (!meshNode)
 		{
@@ -106,86 +105,54 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	// parse other nodes, this step makes sure the mesh nodes are in the front
 	parseNoneMeshNodes(m_aiScene->mRootNode);
+	for (uint i = 0; i < m_Nodes.size(); ++i)
+	{
+		int parentIdx = -1;
+		for (int j = 0; j < (int)m_Nodes.size(); ++j)
+		{
+			if (m_Nodes[j] == m_Nodes[i]->mParent)
+			{
+				parentIdx = j;
+				break;
+			}
+		}
+
+		cout << "\n" << i << " " /*<< parentIdx << " "*/ << m_Nodes[i]->mName.C_Str();
+	}
+
+	// load bones
+	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
+	{
+		aiMesh* mesh = m_aiScene->mMeshes[i];
+		if (mesh->HasBones())
+			loadBones(i, mesh);
+	}
 
 	// generate the skeleton of the model
 	// specify the root bone
-	if (m_BoneMapping.size() > 0)
-	{
-		Bone* skeleton_root = new Bone();
-		skeleton_root->m_ID = 9999;
-		skeleton_root->m_name = "Skeleton ROOT";
-
-		mat4 identity;
-		generateSkeleton(m_aiScene->mRootNode, skeleton_root, identity);
-		m_skeleton = new Skeleton(skeleton_root, m_GlobalInverseTransform);
-
-		// print out the skeleton
-		//m_skeleton->dumpSkeleton(skeleton_root, 0);
-	}
+ 	if (m_BoneMapping.size() > 0)
+// 	{
+// 		Bone* skeleton_root = new Bone();
+// 		skeleton_root->m_ID = 9999;
+// 		skeleton_root->m_name = "Skeleton ROOT";
+// 
+// 		mat4 identity;
+// 		generateSkeleton(m_aiScene->mRootNode, skeleton_root, identity);
+// 		m_skeleton = new Skeleton(skeleton_root, m_GlobalInverseTransform);
+// 
+// 		// print out the skeleton
+// 		//m_skeleton->dumpSkeleton(skeleton_root, 0);
+// 	}
 
 	cout << "Loaded " << fileName << endl;
 	cout << "Model has " << m_aiScene->mNumMeshes << " meshes, " << numVertices << " vertices, " << numFaces << " faces. ";
-	if (m_NumBones)
-		cout << "Contains " << m_NumBones << " bones. ";
+	if (m_BoneMapping.size())
+		cout << "Contains " << m_BoneMapping.size() << " bones. ";
 	if (m_aiScene->HasAnimations())
 	{
 		cout << "Contains " << m_aiScene->mAnimations[0]->mDuration << " seconds animation. ";
 	}
 
-	/*
-	// CONSTRUCT THE POD MODEL
-	pvr::assets::Model::InternalData& modelInternalData = model.getInternalData();
-
-	// camera
-	for (uint i = 0; i < m_aiScene->mNumCameras; ++i)
-	{
-		aiCamera *cam = m_aiScene->mCameras[i];
-		pvr::assets::Camera pvrCam;
-		pvrCam.setFar(cam->mClipPlaneFar);
-		pvrCam.setNear(cam->mClipPlaneNear);
-		pvrCam.setFOV(cam->mHorizontalFOV);
-		modelInternalData.cameras.push_back(pvrCam);
-	}
-
-	// lights
-	for (uint i = 0; i < m_aiScene->mNumLights; ++i)
-	{
-		aiLight *l = m_aiScene->mLights[i];
-		pvr::assets::Light pvrLight;
-		pvrLight.setColor(l->mColorDiffuse.r, l->mColorDiffuse.g, l->mColorDiffuse.b);
-		pvrLight.setConstantAttenuation(l->mAttenuationConstant);
-		pvrLight.setLinearAttenuation(l->mAttenuationLinear);
-		pvrLight.setQuadraticAttenuation(l->mAttenuationQuadratic);
-
-		switch (l->mType)
-		{
-		case aiLightSource_DIRECTIONAL:
-			pvrLight.setType(pvr::assets::Light::Directional);
-			break;
-		case aiLightSource_POINT:
-			pvrLight.setType(pvr::assets::Light::Point);
-			break;
-		case aiLightSource_SPOT:
-			pvrLight.setType(pvr::assets::Light::Spot);
-			break;
-		default:
-			break;
-		}
-
-		modelInternalData.lights.push_back(pvrLight);
-	}
-	
-	for (int i = 0; i < modelDataVector.size(); ++i)
-	{
-		ModelDataPtr md = modelDataVector[i];
-
-		// meshes
-		MeshData mesh = md->meshData;
-		pvr::assets::Mesh pvrMesh;
-		pvrMesh.setNumVertices(mesh.numVertices);
-		pvrMesh.setNumFaces(mesh.numFaces);
-	}
-	*/
 	return modelDataVector;
 }
 
@@ -260,22 +227,16 @@ void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh
 		m_tangents.push_back(tangent);
 	}
 
-	if (mesh->HasBones()) loadBones(index, mesh);
-
-
 	// Populate the index buffer
+	uint numNotsupportedFaces = 0;
 	for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
 	{
 		const aiFace& face = mesh->mFaces[i];
 
-// 		for (uint j = 0; j < face.mNumIndices; ++j)
-// 		{
-// 			m_indices.push_back((uint16)face.mIndices[j]);
-// 		}
-
 		if (face.mNumIndices != 3)
 		{
 			cout << "Unsupported number of indices per face " << face.mNumIndices << endl;
+			++numNotsupportedFaces;
 		}
 		else
 		{
@@ -290,19 +251,21 @@ void ModelLoader::loadBones(uint MeshIndex, const aiMesh* paiMesh)
 {
 	for (uint i = 0; i < paiMesh->mNumBones; ++i)
 	{
-		uint boneIndex = 0;
+		uint8_t boneIndex = 0;
 		string boneName(paiMesh->mBones[i]->mName.data);
 		if (m_BoneMapping.find(boneName) == m_BoneMapping.end())
 		{
 			// Allocate an index for a new bone
-			boneIndex = m_NumBones;
-			m_NumBones++;
+			aiNode* boneNode = getNode(boneName.c_str(), m_Nodes);
+			auto it = std::find(m_Nodes.begin(), m_Nodes.end(), boneNode);
+			boneIndex = std::distance(m_Nodes.begin(), it);
+
 			Bone bi;
-			m_BoneInfo.push_back(bi);
-			m_BoneInfo[boneIndex].m_ID = boneIndex;
-			m_BoneInfo[boneIndex].m_name = boneName;
-			m_BoneInfo[boneIndex].m_offsetMatrix = paiMesh->mBones[i]->mOffsetMatrix;
+			bi.m_ID = boneIndex;
+			bi.m_name = boneName;
+			bi.m_offsetMatrix = paiMesh->mBones[i]->mOffsetMatrix;
 			m_BoneMapping[boneName] = boneIndex;
+			m_BoneInfo.push_back(bi);
 		}
 		else
 		{
@@ -519,7 +482,7 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
 	}
 }
 
-aiNode* ModelLoader::getNodeFromMeshName(const char* meshName, vector<aiNode*>& source)
+aiNode* ModelLoader::getNode(const char* meshName, vector<aiNode*>& source)
 {
 	for each (aiNode* var in source)
 	{
