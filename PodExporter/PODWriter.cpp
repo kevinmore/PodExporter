@@ -632,15 +632,14 @@ void PODWriter::writeNodeBlock(uint index)
 		}
 	}
 
-	// Animation transforms
-	vector<float32> position, rotation, scale;
-
+	// Animation transform matrix list
 	vector<glm::mat4> matrices;
 
-	uint32 flag = 0x00;
+	uint32 flag = 0x00; // no animation
+
 	if (animation)
 	{
-		flag = 0x08;
+		flag = 0x08; // using matrix
 		uint numFrames = std::min(animation->mNumPositionKeys, 
 			std::min(animation->mNumRotationKeys, animation->mNumScalingKeys));
 
