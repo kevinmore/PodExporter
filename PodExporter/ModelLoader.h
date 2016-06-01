@@ -3,6 +3,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 
+typedef unsigned short uint16;
 struct MeshData
 {
 	string name;
@@ -13,6 +14,16 @@ struct MeshData
 	unsigned int baseVertex;
 	unsigned int baseIndex;
 	mat4 unpackMatrix;
+
+	/*
+	*	Vertex Data Containers
+	*/
+	vector<vec3> positions;
+	vector<vec2> texCoords;
+	vector<vec3> normals;
+	vector<vec3> tangents;
+	vector<uint16> indices;
+	vector<VertexBoneData> bones;
 };
 
 
@@ -47,7 +58,6 @@ typedef shared_ptr<MeshData> MeshDataPtr;
 typedef shared_ptr<TextureData> TextureDataPtr;
 typedef shared_ptr<MaterialData> MaterialDataPtr;
 typedef shared_ptr<ModelData> ModelDataPtr;
-typedef unsigned short uint16;
 
 class ModelLoader
 {
@@ -69,12 +79,6 @@ public:
 	vector<ModelDataPtr> loadModel(const string& filename, LoadingQuality flag = MAX_QUALITY);
 	string& getFileNmae() { return m_fileName; }
 	const Skeleton* getSkeleton() { return m_skeleton; }
-	vector<uint16>& geIndexBuffer() { return m_indices; }
-	vector<vec3>& getPositionBuffer() { return m_positions; }
-	vector<vec3>& getNormalBuffer() { return m_normals; }
-	vector<vec3>& getTangetBuffer() { return m_tangents; }
-	vector<vec2>& getUVBuffer() { return m_texCoords; }
-	vector<VertexBoneData>& getBoneBuffer() { return m_Bones; }
 	vector<Bone>& getBoneList() { return m_BoneInfo; }
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
 	uint getNumNodes() { return m_Nodes.size();  }
@@ -89,8 +93,8 @@ private:
 	MeshData     loadMesh(unsigned int index, unsigned int baseVertex, unsigned int baseIndex);
 	MaterialData loadMaterial(const aiMaterial* material);
 	TextureData  loadTexture(const aiMaterial* material);
-	void loadBones(uint MeshIndex, const aiMesh* paiMesh);
-	void prepareVertexContainers(unsigned int index, const aiMesh* mesh);
+	void loadBones(const aiMesh* paiMesh, MeshData& data);
+	void readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data);
 	void generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
@@ -103,15 +107,6 @@ private:
 	void clear();
 
 	/*
-	*	Vertex Data Containers
-	*/
-	vector<vec3> m_positions;
-	vector<vec2> m_texCoords;
-	vector<vec3> m_normals;
-	vector<vec3> m_tangents;
-	vector<uint16> m_indices;
-
-	/*
 	*	Members Variables
 	*/
 	string m_fileName;
@@ -122,7 +117,6 @@ private:
 	map<string, uint> m_BoneMapping; // maps a bone name to its index
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
-	vector<VertexBoneData> m_Bones;
 	vector<string> m_texturePaths;
 	vector<Bone> m_BoneInfo;
 	mat4 m_GlobalInverseTransform;

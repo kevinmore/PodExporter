@@ -4,12 +4,6 @@
 
 void ModelLoader::clear()
 {
-	m_positions.clear();
-	m_texCoords.clear();
-	m_normals.clear();
-	m_tangents.clear();
-	m_indices.clear();
-	m_Bones.clear();
 	m_texturePaths.clear();
 
 	// delete the nodes that we created for the sub meshes
@@ -66,12 +60,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
 		numFaces += m_aiScene->mMeshes[i]->mNumFaces;
 	}
-	m_positions.reserve(numVertices);
-	m_normals.reserve(numVertices);
-	m_texCoords.reserve(numVertices);
-	m_tangents.reserve(numVertices);
-	m_indices.reserve(numIndices);
-	m_Bones.resize(numVertices);
 
 	numVertices = 0;
 	numIndices = 0;
@@ -125,7 +113,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	{
 		aiMesh* mesh = m_aiScene->mMeshes[i];
 		if (mesh->HasBones())
-			loadBones(i, mesh);
+			loadBones(mesh, modelDataVector[i]->meshData);
 	}
 
 	// generate the skeleton of the model
@@ -209,7 +197,7 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 	return result;
 }
 
-void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh)
+void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data)
 {
 	const vec3 zero3D(0.0f, 0.0f, 0.0f);
 
@@ -221,10 +209,10 @@ void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh
 		vec3 normal = mesh->HasNormals() ? mesh->mNormals[i] : zero3D;
 		vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[i] : zero3D;
 
-		m_positions.push_back(pos);
-		m_texCoords.push_back(vec2(texCoord.x, texCoord.y));
-		m_normals.push_back(normal);
-		m_tangents.push_back(tangent);
+		data.positions.push_back(pos);
+		data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
+		data.normals.push_back(normal);
+		data.tangents.push_back(tangent);
 	}
 
 	// Populate the index buffer
@@ -240,15 +228,16 @@ void ModelLoader::prepareVertexContainers(unsigned int index, const aiMesh* mesh
 		}
 		else
 		{
-			m_indices.push_back((uint16)face.mIndices[0]);
-			m_indices.push_back((uint16)face.mIndices[1]);
-			m_indices.push_back((uint16)face.mIndices[2]);
+			data.indices.push_back((uint16)face.mIndices[0]);
+			data.indices.push_back((uint16)face.mIndices[1]);
+			data.indices.push_back((uint16)face.mIndices[2]);
 		}
 	}
 }
 
-void ModelLoader::loadBones(uint MeshIndex, const aiMesh* paiMesh)
+void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
 {
+	data.bones.resize(paiMesh->mNumVertices);
 	for (uint i = 0; i < paiMesh->mNumBones; ++i)
 	{
 		uint8_t boneIndex = 0;
@@ -272,17 +261,11 @@ void ModelLoader::loadBones(uint MeshIndex, const aiMesh* paiMesh)
 			boneIndex = m_BoneMapping[boneName];
 		}
 
-		uint offset = 0;
-		for (uint k = 0; k < MeshIndex; ++k)
-		{
-			offset += m_aiScene->mMeshes[k]->mNumVertices;
-		}
-
 		for (uint j = 0; j < paiMesh->mBones[i]->mNumWeights; ++j)
 		{
-			uint VertexID = offset + paiMesh->mBones[i]->mWeights[j].mVertexId;
+			uint VertexID = paiMesh->mBones[i]->mWeights[j].mVertexId;
 			float Weight = paiMesh->mBones[i]->mWeights[j].mWeight;
-			m_Bones[VertexID].AddBoneData(boneIndex, Weight);
+			data.bones[VertexID].AddBoneData(boneIndex, Weight);
 		}
 	}
 }
@@ -333,7 +316,7 @@ MeshData ModelLoader::loadMesh(unsigned int index, unsigned int baseVertex, unsi
 	data.baseVertex = baseVertex;
 	data.baseIndex = baseIndex;
 
-	prepareVertexContainers(index, mesh);
+	readVertexAttributes(index, mesh, data);
 
 	return data;
 }

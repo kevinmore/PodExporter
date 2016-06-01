@@ -415,11 +415,11 @@ void PODWriter::writeMeshBlock(uint index)
 	writeEndTag(pod::e_meshNumUVWChannels);
 
 	// Get vertex attributes buffers from the model loader
-	vector<vec3> positionBuffer = m_modelLoader.getPositionBuffer();
-	vector<vec3> normalBuffer = m_modelLoader.getNormalBuffer();
-	vector<vec3> tangentBuffer = m_modelLoader.getTangetBuffer();
-	vector<vec2> uvBuffer = m_modelLoader.getUVBuffer();
-	vector<VertexBoneData> boneBuffer = m_modelLoader.getBoneBuffer();
+	vector<vec3> positionBuffer = meshData.positions;
+	vector<vec3> normalBuffer = meshData.normals;
+	vector<vec3> tangentBuffer = meshData.tangents;
+	vector<vec2> uvBuffer = meshData.texCoords;
+	vector<VertexBoneData> boneBuffer = meshData.bones;
 
 	// Interleaved Data List
 	// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 64 bytes)
@@ -428,7 +428,7 @@ void PODWriter::writeMeshBlock(uint index)
 		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
 
 	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
-	for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
+	for (uint i = 0; i < meshData.numVertices; ++i)
 	{
 		writeBytes(m_fileStream, positionBuffer[i]);
 		writeBytes(m_fileStream, normalBuffer[i]);
@@ -443,14 +443,9 @@ void PODWriter::writeMeshBlock(uint index)
  	writeEndTag(pod::e_meshInterleavedDataList);
 
 	// Vertex Index List
-	vector<uint16> entireIndexBuffer = m_modelLoader.geIndexBuffer();
-	vector<uint16> currentIndexBuffer;
-	for (uint i = meshData.baseIndex; i < meshData.baseIndex + meshData.numIndices; ++i)
-	{
-		currentIndexBuffer.push_back(entireIndexBuffer[i]);
-	}
-	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * currentIndexBuffer.size());
-	writeVertexIndexData<uint16>(m_fileStream, currentIndexBuffer);
+	vector<uint16> indexBuffer = meshData.indices;
+	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * indexBuffer.size());
+	writeVertexIndexData<uint16>(m_fileStream, indexBuffer);
 	writeEndTag(pod::e_meshVertexIndexList);
 
 	// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
@@ -501,11 +496,11 @@ void PODWriter::writeMeshBlock(uint index)
 // 			}
 // 		}
 
- 		for (uint i = 0; i < currentIndexBuffer.size(); ++i)
+ 		for (uint i = 0; i < indexBuffer.size(); ++i)
  		{
  			for (uint j = 0; j < 4; ++j)
  			{
- 				uint8 id = boneBuffer[currentIndexBuffer[i] + meshData.baseVertex].IDs[j];
+ 				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
  				// bone id will never be 0, as the mesh nodes are the first ones
  				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
  					boneIds.push_back(id);
