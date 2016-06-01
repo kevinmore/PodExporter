@@ -123,7 +123,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="PODWriter.cpp" />
-    <ClCompile Include="Skeleton.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BoneInfo.h" />
@@ -131,7 +130,6 @@
     <ClInclude Include="ModelConverter.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="PODWriter.h" />
-    <ClInclude Include="Skeleton.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -116,22 +116,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			loadBones(mesh, modelDataVector[i]->meshData);
 	}
 
-	// generate the skeleton of the model
-	// specify the root bone
- 	if (m_BoneMapping.size() > 0)
-// 	{
-// 		Bone* skeleton_root = new Bone();
-// 		skeleton_root->m_ID = 9999;
-// 		skeleton_root->m_name = "Skeleton ROOT";
-// 
-// 		mat4 identity;
-// 		generateSkeleton(m_aiScene->mRootNode, skeleton_root, identity);
-// 		m_skeleton = new Skeleton(skeleton_root, m_GlobalInverseTransform);
-// 
-// 		// print out the skeleton
-// 		//m_skeleton->dumpSkeleton(skeleton_root, 0);
-// 	}
-
 	cout << "Loaded " << fileName << endl;
 	cout << "Model has " << m_aiScene->mNumMeshes << " meshes, " << numVertices << " vertices, " << numFaces << " faces. ";
 	if (m_BoneMapping.size())

@@ -223,9 +223,10 @@ PODWriter::PODWriter(ModelLoader& loader)
 {
 }
 
-void PODWriter::exportModel(const std::string& path, bool exportAnimations)
+void PODWriter::exportModel(const std::string& path, bool exportSkinningData, bool exportAnimations)
 {
 	m_exportAnimations = exportAnimations;
+	m_exportSkinningData = exportSkinningData;
 
 	m_fileStream = fstream(path, ios::binary | ios::out | ios::trunc);
 
@@ -423,7 +424,7 @@ void PODWriter::writeMeshBlock(uint index)
 
 	// Interleaved Data List
 	// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 64 bytes)
-	uint32 stride = (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations) ?
+	uint32 stride = m_exportSkinningData ?
 		sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0])
 		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
 
@@ -434,7 +435,7 @@ void PODWriter::writeMeshBlock(uint index)
 		writeBytes(m_fileStream, normalBuffer[i]);
 		writeBytes(m_fileStream, tangentBuffer[i]);
 		writeBytes(m_fileStream, uvBuffer[i]);
-		if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
+		if (m_exportSkinningData)
 		{
 			writeBytes(m_fileStream, boneBuffer[i].Weights);
 			writeBytes(m_fileStream, boneBuffer[i].IDs);
@@ -470,7 +471,7 @@ void PODWriter::writeMeshBlock(uint index)
 	offset += DataType::size(DataType::Float32) * 2;
 	writeEndTag(pod::e_meshUVWList);
 
-	if (m_modelLoader.getScene()->HasAnimations() && m_exportAnimations)
+	if (m_exportSkinningData)
 	{
 		writeStartTag(pod::e_meshBoneWeightList, 0);
 		writeDummyVertexData(m_fileStream, DataType::Float32, 4, stride, offset);
@@ -485,17 +486,9 @@ void PODWriter::writeMeshBlock(uint index)
 		// process bones
 		// get the bone ids affecting the vertices of this mesh
 		vector<uint8> boneIds;
-// 		for (uint i = meshData.baseVertex; i < meshData.baseVertex + meshData.numVertices; ++i)
-// 		{
-// 			for (uint j = 0; j < 4; ++j)
-// 			{
-// 				uint8 id = boneBuffer[i].IDs[j];
-// 				// bone id will never be 0, as the mesh nodes are the first ones
-// 				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
-// 					boneIds.push_back(id);
-// 			}
-// 		}
 
+		// constructing the boneIds vector through index buffer makes sure that
+		// the bone batch will based on the face list order
  		for (uint i = 0; i < indexBuffer.size(); ++i)
  		{
  			for (uint j = 0; j < 4; ++j)
@@ -538,39 +531,43 @@ void PODWriter::writeMeshBlock(uint index)
 		}
 
 		writeStartTag(pod::e_meshNumBoneIndicesPerBatch, 4 * batchesCount);
-		write4ByteArray(m_fileStream, &actualBoneCountsList, batchesCount);
+		write4ByteArrayFromVector(m_fileStream, actualBoneCountsList);
 		writeEndTag(pod::e_meshNumBoneIndicesPerBatch);
 
 		// Bone Batch Index List 
 		// A list of indices into the "Node" list, each indexed "Node" representing the transformations associated with a single bone. 
 		// (Read via "Bone Index List"). 
-		vector<vector<uint32>> batches;
+		writeStartTag(pod::e_meshBoneBatchIndexList, 4 * batchStride * batchesCount);
 		uint count = 0;
 		for (uint i = 0; i < batchesCount; ++i)
 		{
 			vector<uint32> batch;
 			uint32 actualNum = actualBoneCountsList[i];
 			for (uint j = 0; j < actualNum; ++j)
-			{
 				batch.push_back(boneIds[count++]);
-			}
 			for (uint j = actualNum; j < batchStride; ++j)
-			{
-				// padding with 0
-				batch.push_back(0);
-			}
+				
+				batch.push_back(0); // padding with 0
 
-			batches.push_back(batch);
+			write4ByteArrayFromVector(m_fileStream, batch);
 		}
-		writeStartTag(pod::e_meshBoneBatchIndexList, 4 * batchStride * batchesCount);
-		write4ByteArray(m_fileStream, &batches, 4 * batchStride * batchesCount);
 		writeEndTag(pod::e_meshBoneBatchIndexList);
 
 		// Bone Offset per Batch
 		// A list of integers, each integer representing the offset into the "Vertex List", 
 		// or "Vertex Index List" of the data is indexed, the batch starts at. 
-		//writeStartTag(pod::e_meshBoneOffsetPerBatch, 8);
-		//writeEndTag(pod::e_meshBoneOffsetPerBatch);
+  		boneIds.clear();
+  		vector<uint32> offsetsList;
+  		uint32 indexOffset = 0;
+  		for (uint i = 0; i < batchesCount; ++i)
+  		{
+ 			//uint32 numBones = actualBoneCountsList[i];
+ 			offsetsList.push_back(indexOffset += 500); // need fix
+  		}
+  
+  		writeStartTag(pod::e_meshBoneOffsetPerBatch, 4 * batchesCount);
+ 		write4ByteArrayFromVector(m_fileStream, offsetsList);
+  		writeEndTag(pod::e_meshBoneOffsetPerBatch);
 	}
 
 	writeEndTag(pod::e_sceneMesh);
@@ -636,54 +633,52 @@ void PODWriter::writeNodeBlock(uint index)
 	}
 
 	// Animation transforms
-	vector<float32> position, rotation, scale, matrices;
+	vector<float32> position, rotation, scale;
 
-	// Animation Flag
-	uint32 flag = 0;
+	vector<glm::mat4> matrices;
+
+	uint32 flag = 0x00;
 	if (animation)
 	{
-		if (animation->mNumPositionKeys > 0)
+		flag = 0x08;
+		uint numFrames = std::min(animation->mNumPositionKeys, 
+			std::min(animation->mNumRotationKeys, animation->mNumScalingKeys));
+
+		for (uint i = 0; i < numFrames; ++i)
 		{
-			flag |= 0x01;
-			for (uint i = 0; i < animation->mNumPositionKeys; ++i)
-			{
-				// vec3
-				position.push_back(animation->mPositionKeys[i].mValue.x);
-				position.push_back(animation->mPositionKeys[i].mValue.y);
-				position.push_back(animation->mPositionKeys[i].mValue.z);
-			}
+			// position
+			glm::mat4 translation = glm::translate(glm::vec3(animation->mPositionKeys[i].mValue.x,
+				animation->mPositionKeys[i].mValue.y, animation->mPositionKeys[i].mValue.z));
+
+			// rotation
+			glm::mat4 rotation = glm::mat4_cast(glm::quat(animation->mRotationKeys[i].mValue.w, animation->mRotationKeys[i].mValue.x,
+				animation->mRotationKeys[i].mValue.y, animation->mRotationKeys[i].mValue.z));
+
+			// scale
+			glm::mat4 scaling = glm::scale(glm::vec3(animation->mScalingKeys[i].mValue.x,
+				animation->mScalingKeys[i].mValue.y, animation->mScalingKeys[i].mValue.z));
+			
+			matrices.push_back(translation * rotation * scaling);
 		}
-		if (animation->mNumRotationKeys > 0)
-		{
-			flag |= 0x02;
-			for (uint i = 0; i < animation->mNumRotationKeys; ++i)
-			{
-				// quaternion
-				position.push_back(animation->mRotationKeys[i].mValue.x);
-				position.push_back(animation->mRotationKeys[i].mValue.y);
-				position.push_back(animation->mRotationKeys[i].mValue.z);
-				position.push_back(animation->mRotationKeys[i].mValue.w); // may need to change order
-			}
-		}
-		if (animation->mNumScalingKeys > 0)
-			flag |= 0x04;
-		// scaling not supported
 	}
+	else
+	{
+		glm::mat4 identity;
+		matrices.push_back(identity);
+	}
+
+	// Animation Flag
 	writeStartTag(pod::e_nodeAnimationFlags, 4);
 	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);
 
-	// Animation Position, 3 floats per frame of animation
-	writeStartTag(pod::e_nodeAnimationPosition, 4 * 3);
-	writeEndTag(pod::e_nodeAnimationPosition);
-
-	// Animation Rotation, 4 floats per frame of animation
-	writeStartTag(pod::e_nodeAnimationRotation, 4 * 4);
-	writeEndTag(pod::e_nodeAnimationRotation);
-
-	// Animation Scale, 7 floats per frame of animation
-	writeStartTag(pod::e_nodeAnimationScale, 4 * 7);
-	writeEndTag(pod::e_nodeAnimationScale);
+	// Animation Matrix, 16 floats per frame of animation
+	writeStartTag(pod::e_nodeAnimationMatrix, sizeof(matrices[0]) * matrices.size());
+	for (uint i = 0; i < matrices.size(); ++i)
+	{
+		write4ByteArray(m_fileStream, &matrices[i][0][0], 16);
+	}
+	writeEndTag(pod::e_nodeAnimationMatrix);
 
 	writeEndTag(pod::e_sceneNode);
 }

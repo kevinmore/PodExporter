@@ -14,7 +14,7 @@ class PODWriter : public AssetWriter<Model>
 public:
 	PODWriter(ModelLoader& loader);
 
-	void exportModel(const std::string& path, bool exportAnimations = true);
+	void exportModel(const std::string& path, bool exportSkinningData = true, bool exportAnimations = true);
 	void setModels(vector<ModelDataPtr>& models) { m_modelDataVec = models; }
 
 	virtual bool addAssetToWrite(const Model& asset);
@@ -41,6 +41,7 @@ private:
 	ModelLoader m_modelLoader;
 	vector<ModelDataPtr> m_modelDataVec;
 	vector<aiNode*> m_Nodes;
+	bool m_exportSkinningData;
 	bool m_exportAnimations;
 
 	fstream m_fileStream;
