@@ -369,10 +369,6 @@ MaterialData ModelLoader::loadMaterial(const aiMaterial* material)
 					data.blendMode = aiBlendMode_Default;
 			}
 		}
-		else
-		{
-			data.blendMode = -1;
-		}
 	}
 
 	if (material->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS)

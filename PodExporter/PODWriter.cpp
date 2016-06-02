@@ -223,10 +223,10 @@ PODWriter::PODWriter(ModelLoader& loader)
 {
 }
 
-void PODWriter::exportModel(const std::string& path, bool exportSkinningData, bool exportAnimations)
+void PODWriter::exportModel(const std::string& path, ExportOptions options)
 {
-	m_exportAnimations = exportAnimations;
-	m_exportSkinningData = exportSkinningData;
+	m_exportSkinningData = options == ExportEverything || ExportSkinningData;
+	m_exportAnimations = options == ExportEverything || ExportAnimation;
 
 	m_fileStream = fstream(path, ios::binary | ios::out | ios::trunc);
 
@@ -422,57 +422,53 @@ void PODWriter::writeMeshBlock(uint index)
 	vector<vec2> uvBuffer = meshData.texCoords;
 	vector<VertexBoneData> boneBuffer = meshData.bones;
 
-	// Interleaved Data List
-	// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + BoneWeight.xyzw + BoneIndex.xyzw (stride = 64 bytes)
-	uint32 stride = m_exportSkinningData ?
-		sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0])
-		: sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
-
-	writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
-	for (uint i = 0; i < meshData.numVertices; ++i)
+	if (m_exportSkinningData)
 	{
-		writeBytes(m_fileStream, positionBuffer[i]);
-		writeBytes(m_fileStream, normalBuffer[i]);
-		writeBytes(m_fileStream, tangentBuffer[i]);
-		writeBytes(m_fileStream, uvBuffer[i]);
-		if (m_exportSkinningData)
+		// adjust the vertex buffer
+		// Interleaved Data List
+		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + boneWeights.xyzw + boneID.xyzw
+		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
+
+		writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
+		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
+			writeBytes(m_fileStream, positionBuffer[i]);
+			writeBytes(m_fileStream, normalBuffer[i]);
+			writeBytes(m_fileStream, tangentBuffer[i]);
+			writeBytes(m_fileStream, uvBuffer[i]);
 			writeBytes(m_fileStream, boneBuffer[i].Weights);
 			writeBytes(m_fileStream, boneBuffer[i].IDs);
 		}
-	}
- 	writeEndTag(pod::e_meshInterleavedDataList);
+		writeEndTag(pod::e_meshInterleavedDataList);
 
-	// Vertex Index List
-	vector<uint16> indexBuffer = meshData.indices;
-	writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * indexBuffer.size());
-	writeVertexIndexData<uint16>(m_fileStream, indexBuffer);
-	writeEndTag(pod::e_meshVertexIndexList);
+		// Vertex Index List
+		vector<uint16> indexBuffer = meshData.indices;
+		writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * indexBuffer.size());
+		writeVertexIndexData<uint16>(m_fileStream, indexBuffer);
+		writeEndTag(pod::e_meshVertexIndexList);
 
-	// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
-	uint32 offset = 0;
-	writeStartTag(pod::e_meshVertexList, 0);
-	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
-	offset += DataType::size(DataType::Float32) * 3;
-	writeEndTag(pod::e_meshVertexList);
+		// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
+		uint32 offset = 0;
+		writeStartTag(pod::e_meshVertexList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshVertexList);
 
-	writeStartTag(pod::e_meshNormalList, 0);
-	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
-	offset += DataType::size(DataType::Float32) * 3;
-	writeEndTag(pod::e_meshNormalList);
+		writeStartTag(pod::e_meshNormalList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshNormalList);
 
-	writeStartTag(pod::e_meshTangentList, 0);
-	writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
-	offset += DataType::size(DataType::Float32) * 3;
-	writeEndTag(pod::e_meshTangentList);
+		writeStartTag(pod::e_meshTangentList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshTangentList);
 
-	writeStartTag(pod::e_meshUVWList, 0);
-	writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);
-	offset += DataType::size(DataType::Float32) * 2;
-	writeEndTag(pod::e_meshUVWList);
+		writeStartTag(pod::e_meshUVWList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);
+		offset += DataType::size(DataType::Float32) * 2;
+		writeEndTag(pod::e_meshUVWList);
 
-	if (m_exportSkinningData)
-	{
 		writeStartTag(pod::e_meshBoneWeightList, 0);
 		writeDummyVertexData(m_fileStream, DataType::Float32, 4, stride, offset);
 		offset += DataType::size(DataType::Float32) * 4;
@@ -489,16 +485,16 @@ void PODWriter::writeMeshBlock(uint index)
 
 		// constructing the boneIds vector through index buffer makes sure that
 		// the bone batch will based on the face list order
- 		for (uint i = 0; i < indexBuffer.size(); ++i)
- 		{
- 			for (uint j = 0; j < 4; ++j)
- 			{
- 				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
- 				// bone id will never be 0, as the mesh nodes are the first ones
- 				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
- 					boneIds.push_back(id);
- 			}
- 		}
+		for (uint i = 0; i < indexBuffer.size(); ++i)
+		{
+			for (uint j = 0; j < 4; ++j)
+			{
+				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
+				// bone id will never be 0, as the mesh nodes are the first ones
+				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
+					boneIds.push_back(id);
+			}
+		}
 
 		// Max. Num. Bones per Batch 
 		uint32 batchStride = 9;
@@ -546,7 +542,7 @@ void PODWriter::writeMeshBlock(uint index)
 			for (uint j = 0; j < actualNum; ++j)
 				batch.push_back(boneIds[count++]);
 			for (uint j = actualNum; j < batchStride; ++j)
-				
+
 				batch.push_back(0); // padding with 0
 
 			write4ByteArrayFromVector(m_fileStream, batch);
@@ -556,18 +552,62 @@ void PODWriter::writeMeshBlock(uint index)
 		// Bone Offset per Batch
 		// A list of integers, each integer representing the offset into the "Vertex List", 
 		// or "Vertex Index List" of the data is indexed, the batch starts at. 
-  		boneIds.clear();
-  		vector<uint32> offsetsList;
-  		uint32 indexOffset = 0;
-  		for (uint i = 0; i < batchesCount; ++i)
-  		{
- 			//uint32 numBones = actualBoneCountsList[i];
- 			offsetsList.push_back(indexOffset += 500); // need fix
-  		}
-  
-  		writeStartTag(pod::e_meshBoneOffsetPerBatch, 4 * batchesCount);
- 		write4ByteArrayFromVector(m_fileStream, offsetsList);
-  		writeEndTag(pod::e_meshBoneOffsetPerBatch);
+		boneIds.clear();
+		vector<uint32> offsetsList;
+		uint32 indexOffset = 0;
+		for (uint i = 0; i < batchesCount; ++i)
+		{
+			//uint32 numBones = actualBoneCountsList[i];
+			offsetsList.push_back(indexOffset += 500); // need fix
+		}
+
+		writeStartTag(pod::e_meshBoneOffsetPerBatch, 4 * batchesCount);
+		write4ByteArrayFromVector(m_fileStream, offsetsList);
+		writeEndTag(pod::e_meshBoneOffsetPerBatch);
+	}
+	else
+	{
+		// Interleaved Data List
+		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy
+		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
+
+		writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
+		for (uint i = 0; i < meshData.numVertices; ++i)
+		{
+			writeBytes(m_fileStream, positionBuffer[i]);
+			writeBytes(m_fileStream, normalBuffer[i]);
+			writeBytes(m_fileStream, tangentBuffer[i]);
+			writeBytes(m_fileStream, uvBuffer[i]);
+		}
+		writeEndTag(pod::e_meshInterleavedDataList);
+
+		// Vertex Index List
+		vector<uint16> indexBuffer = meshData.indices;
+		writeStartTag(pod::e_meshVertexIndexList, sizeof(uint16) * indexBuffer.size());
+		writeVertexIndexData<uint16>(m_fileStream, indexBuffer);
+		writeEndTag(pod::e_meshVertexIndexList);
+
+		// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
+		uint32 offset = 0;
+		writeStartTag(pod::e_meshVertexList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshVertexList);
+
+		writeStartTag(pod::e_meshNormalList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshNormalList);
+
+		writeStartTag(pod::e_meshTangentList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshTangentList);
+
+		writeStartTag(pod::e_meshUVWList, 0);
+		writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);
+		offset += DataType::size(DataType::Float32) * 2;
+		writeEndTag(pod::e_meshUVWList);
 	}
 
 	writeEndTag(pod::e_sceneMesh);
