@@ -17,10 +17,12 @@ namespace VEEMEE
 		ModelConverter(ModelConverter const&) = delete;
 		void operator=(ModelConverter const&) = delete;
 
-		void ConvertToPOD(const std::string& fileName)
+		void ConvertToPOD(const std::string& fileName, PODWriter::ExportOptions options = PODWriter::ExportEverything)
 		{
 			ModelLoader loader;
 			vector<ModelDataPtr> models = loader.loadModel(fileName);
+
+			if (models.size() == 0) return;
 
 			PODWriter exporter(loader);
 			exporter.setModels(models);
@@ -32,6 +34,7 @@ namespace VEEMEE
 				nameWithoutExtension = fileName.substr(0, last_idx);
 			}
 
+			exporter.exportModel(nameWithoutExtension + ".pod", options);
 		}
 
 	private:

@@ -1,5 +1,5 @@
 #include "ModelConverter.h"
 void main()
 {
-	VEEMEE::ModelConverter::getInstance().ConvertToPOD("D:/Imagination/m005.DAE");
+	VEEMEE::ModelConverter::getInstance().ConvertToPOD("D:/Imagination/m005.DAE", PODWriter::ExportSkinningData);
 }
