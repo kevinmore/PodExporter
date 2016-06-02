@@ -34,7 +34,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	uint flags;
 
 	if (flag == SIMPLE)
-		flags = aiProcess_Triangulate | aiProcess_GenNormals;
+		flags = aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace;
 	else if (flag == FAST)
 		flags = aiProcessPreset_TargetRealtime_Fast;
 	else if (flag == QUALITY)

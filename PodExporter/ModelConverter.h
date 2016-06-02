@@ -32,7 +32,6 @@ namespace VEEMEE
 				nameWithoutExtension = fileName.substr(0, last_idx);
 			}
 
-			exporter.exportModel(nameWithoutExtension + ".pod", PODWriter::ExportSkinningData);
 		}
 
 	private:

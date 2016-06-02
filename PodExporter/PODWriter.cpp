@@ -177,7 +177,7 @@ void writeVertexData(fstream& stream, DataType::Enum type, uint32 numComponents,
 	writeTag(stream, pod::c_endTagMask, pod::e_blockData, 0);
 }
 
-void writeDummyVertexData(fstream& stream, DataType::Enum type, uint32 numComponents, uint32 stride, uint32 offset)
+void writeVertexAttributeOffset(fstream& stream, DataType::Enum type, uint32 numComponents, uint32 stride, uint32 offset)
 {
 	// write block data type
 	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
@@ -580,32 +580,32 @@ void PODWriter::writeMeshBlock(uint index)
 		// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
 		uint32 offset = 0;
 		writeStartTag(pod::e_meshVertexList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshVertexList);
 
 		writeStartTag(pod::e_meshNormalList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshNormalList);
 
 		writeStartTag(pod::e_meshTangentList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshTangentList);
 
 		writeStartTag(pod::e_meshUVWList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 2, stride, offset);
 		offset += DataType::size(DataType::Float32) * 2;
 		writeEndTag(pod::e_meshUVWList);
 
 		writeStartTag(pod::e_meshBoneWeightList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 4, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 4, stride, offset);
 		offset += DataType::size(DataType::Float32) * 4;
 		writeEndTag(pod::e_meshBoneWeightList);
 
 		writeStartTag(pod::e_meshBoneIndexList, 0);
-		writeDummyVertexData(m_fileStream, DataType::UInt8, 4, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::UInt8, 4, stride, offset);
 		offset += DataType::size(DataType::UInt8) * 4;
 		writeEndTag(pod::e_meshBoneIndexList);
 	}
@@ -633,22 +633,22 @@ void PODWriter::writeMeshBlock(uint index)
 		// Dummy Vertex Attribute Lists (as all the vertex data is in the interleaved data list)
 		uint32 offset = 0;
 		writeStartTag(pod::e_meshVertexList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshVertexList);
 
 		writeStartTag(pod::e_meshNormalList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshNormalList);
 
 		writeStartTag(pod::e_meshTangentList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 3, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshTangentList);
 
 		writeStartTag(pod::e_meshUVWList, 0);
-		writeDummyVertexData(m_fileStream, DataType::Float32, 2, stride, offset);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 2, stride, offset);
 		offset += DataType::size(DataType::Float32) * 2;
 		writeEndTag(pod::e_meshUVWList);
 	}
