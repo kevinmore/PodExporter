@@ -1,7 +1,7 @@
 #pragma once
 #include "ModelLoader.h"
 #include "PODWriter.h"
-
+using namespace pvr::assets::assetWriters;
 namespace VEEMEE
 {
 	class ModelConverter
@@ -22,7 +22,7 @@ namespace VEEMEE
 			ModelLoader loader;
 			vector<ModelDataPtr> models = loader.loadModel(fileName);
 
-			pvr::assets::assetWriters::PODWriter exporter(loader);
+			PODWriter exporter(loader);
 			exporter.setModels(models);
 
 			string nameWithoutExtension;
@@ -32,7 +32,7 @@ namespace VEEMEE
 				nameWithoutExtension = fileName.substr(0, last_idx);
 			}
 
-			exporter.exportModel(nameWithoutExtension + ".pod");
+			exporter.exportModel(nameWithoutExtension + ".pod", PODWriter::ExportSkinningData);
 		}
 
 	private:

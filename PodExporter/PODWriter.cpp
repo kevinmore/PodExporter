@@ -224,13 +224,18 @@ PODWriter::PODWriter(ModelLoader& loader)
 
 void PODWriter::exportModel(const std::string& path, ExportOptions options)
 {
+	// determine export options
 	m_exportSkinningData = (options == ExportEverything) || (options == ExportSkinningData);
 	m_exportAnimations = m_modelLoader.getScene()->HasAnimations() && (options == ExportEverything || options == ExportAnimation) ;
-
-	for (uint i = 0; i < m_modelLoader.getScene()->mNumMeshes; ++i)
+	
+	// validate if there is skinning data
+	if (m_exportSkinningData)
 	{
-		aiMesh* mesh = m_modelLoader.getScene()->mMeshes[i];
-		m_exportSkinningData = m_exportSkinningData && m_modelLoader.getScene()->mMeshes[i]->HasBones();
+		for (uint i = 0; i < m_modelLoader.getScene()->mNumMeshes; ++i)
+		{
+			aiMesh* mesh = m_modelLoader.getScene()->mMeshes[i];
+			m_exportSkinningData = m_exportSkinningData && m_modelLoader.getScene()->mMeshes[i]->HasBones();
+		}
 	}
 
 	m_fileStream = fstream(path, ios::binary | ios::out | ios::trunc);
@@ -692,7 +697,7 @@ void PODWriter::writeNodeBlock(uint index)
 	writeEndTag(pod::e_nodeParentIndex);
 
 	// early exit if animation exporting is not required
-	if (m_exportAnimations)
+	if (!m_exportAnimations)
 	{
 		writeEndTag(pod::e_sceneNode);
 		return;
