@@ -93,20 +93,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	// parse other nodes, this step makes sure the mesh nodes are in the front
 	parseNoneMeshNodes(m_aiScene->mRootNode);
-	for (uint i = 0; i < m_Nodes.size(); ++i)
-	{
-		int parentIdx = -1;
-		for (int j = 0; j < (int)m_Nodes.size(); ++j)
-		{
-			if (m_Nodes[j] == m_Nodes[i]->mParent)
-			{
-				parentIdx = j;
-				break;
-			}
-		}
-
-		cout << "\n" << i << " " /*<< parentIdx << " "*/ << m_Nodes[i]->mName.C_Str();
-	}
 
 	// load bones
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
@@ -114,6 +100,13 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		aiMesh* mesh = m_aiScene->mMeshes[i];
 		if (mesh->HasBones())
 			loadBones(mesh, modelDataVector[i]->meshData);
+	}
+	
+	// remove unnecessary nodes
+	cleanUpNodes();
+	for (uint i = 0; i < m_Nodes.size(); ++i)
+	{
+		cout << "\n" << i << " "  << m_Nodes[i]->mName.C_Str();
 	}
 
 	cout << "Loaded " << fileName << endl;
@@ -149,8 +142,7 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 				// create mesh nodes
 				aiNode* meshNode = new aiNode(result);
 				meshNode->mNumMeshes = 1;
-				aiNode* parent = pNode->mParent;
-				meshNode->mParent = parent;
+				meshNode->mParent = pNode;
 				meshNode->mMeshes = new unsigned int[1]{ meshIndex };
 
 				// register this new node
@@ -251,40 +243,6 @@ void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
 			float Weight = paiMesh->mBones[i]->mWeights[j].mWeight;
 			data.bones[VertexID].AddBoneData(boneIndex, Weight);
 		}
-	}
-}
-
-void ModelLoader::generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform)
-{
-	// generate a skeleton from the existing bone map and BoneInfo vector
-	Bone* pBone = NULL;
-
-	string nodeName(pAiRootNode->mName.data);
-
-	mat4 nodeTransformation(pAiRootNode->mTransformation);
-	mat4 globalTransformation = parentTransform * nodeTransformation;
-
-	// aiNode is not aiBone, aiBones are part of all the aiNodes
-	if (m_BoneMapping.find(nodeName) != m_BoneMapping.end())
-	{
-		uint BoneIndex = m_BoneMapping[nodeName];
-		m_BoneInfo[BoneIndex].m_boneSpaceTransform = pAiRootNode->mTransformation;
-
-		Bone bi = m_BoneInfo[BoneIndex];
-		pBone = new Bone(pRootSkeleton);
-		pBone->m_ID = BoneIndex;
-		pBone->m_name = bi.m_name;
-
-		pBone->m_offsetMatrix = bi.m_offsetMatrix;
-		pBone->m_boneSpaceTransform = pAiRootNode->mTransformation;
-		pBone->m_modelSpaceTransform = globalTransformation;
-		pBone->m_finalTransform = m_GlobalInverseTransform * pBone->m_modelSpaceTransform * pBone->m_offsetMatrix;
-	}
-
-	for (uint i = 0; i < pAiRootNode->mNumChildren; ++i)
-	{
-		if (pBone) generateSkeleton(pAiRootNode->mChildren[i], pBone, globalTransformation);
-		else generateSkeleton(pAiRootNode->mChildren[i], pRootSkeleton, globalTransformation);
 	}
 }
 
@@ -436,8 +394,11 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
 {
 	if (!pNode) return;
 
-	if (pNode->mNumMeshes == 0)
+	// ignore the node with 0 or multiple meshes, the root node
+	if (pNode->mNumMeshes != 1 && pNode->mParent != NULL)
+	{
 		m_Nodes.push_back(pNode);
+	}
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
@@ -456,6 +417,20 @@ aiNode* ModelLoader::getNode(const char* meshName, vector<aiNode*>& source)
 	}
 
 	return NULL;
+}
+
+void ModelLoader::cleanUpNodes()
+{
+	for (uint i = 0; i < m_Nodes.size(); ++i)
+	{
+		// if the node is a child of the scene root, not a mesh node, and does not have any children, remove it
+		// e.g. light, camera, unnamed useless nodes, etc
+		aiNode* node = m_Nodes[i];
+		if (node->mParent == m_aiScene->mRootNode && node->mNumMeshes == 0 && node->mNumChildren == 0)
+		{
+			m_Nodes.erase(m_Nodes.begin() + i);
+		}
+	}
 }
 
 mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)

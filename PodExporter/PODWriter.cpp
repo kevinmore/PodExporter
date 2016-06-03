@@ -717,7 +717,7 @@ void PODWriter::writeMeshBlock(uint index)
  				auto it = std::find(boneIds.begin(), boneIds.end(), boneID);
  				boneID = it == boneIds.end() ? -1 : std::distance(boneIds.begin(), it);
  
-				boneID = j;
+				//boneID = j;
 				writeBytes(m_fileStream, boneID);
  			}
 			writeBytes(m_fileStream, boneBuffer[i].Weights);

@@ -78,7 +78,6 @@ public:
 	*/
 	vector<ModelDataPtr> loadModel(const string& filename, LoadingQuality flag = MAX_QUALITY);
 	string& getFileNmae() { return m_fileName; }
-	const Skeleton* getSkeleton() { return m_skeleton; }
 	vector<Bone>& getBoneList() { return m_BoneInfo; }
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
 	uint getNumNodes() { return m_Nodes.size();  }
@@ -95,10 +94,10 @@ private:
 	TextureData  loadTexture(const aiMaterial* material);
 	void loadBones(const aiMesh* paiMesh, MeshData& data);
 	void readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data);
-	void generateSkeleton(aiNode* pAiRootNode, Bone* pRootSkeleton, mat4& parentTransform);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);
+	void cleanUpNodes();
 	mat4 calculateGlobalTransform(aiNode* pNode);
 
 	/*
@@ -113,7 +112,6 @@ private:
 	// make the importer as member valuable, so that it does not call FreeScene until the class is destructed
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
-	Skeleton* m_skeleton;
 	map<string, uint> m_BoneMapping; // maps a bone name to its index
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
