@@ -224,7 +224,7 @@ PODWriter::PODWriter(ModelLoader& loader)
 
 void PODWriter::exportModel(const std::string& path, ExportOptions options)
 {
-	// determine export options
+	// determine exporting options
 	m_exportSkinningData = (options == ExportEverything) || (options == ExportSkinningData);
 	m_exportAnimations = m_modelLoader.getScene()->HasAnimations() && (options == ExportEverything || options == ExportAnimation) ;
 	
@@ -626,27 +626,38 @@ void PODWriter::writeMeshBlock(uint index)
 				}
 			}
 		}
-
+// 		for (uint i = 0; i < meshData.numVertices; ++i)
+// 		{
+// 			for (uint j = 0; j < 4; ++j)
+// 			{
+// 				uint8 id = boneBuffer[i].IDs[j];
+// 				// bone id will never be 0, as the mesh nodes are the first ones
+// 				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
+// 				{
+// 					boneIds.push_back(id);
+// 				}
+// 			}
+// 		}
 
 		// get the indices that a bone affects
- 		map<uint8, vector<uint>> boneIDAffectedIndices;
- 		map<uint8, vector<uint>> boneIDAffectedFaces;
- 		for (uint i = 0; i < indexBuffer.size(); ++i)
- 		{
- 			for (uint j = 0; j < 4; ++j)
- 			{
- 				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
- 				// bone id will never be 0, as the mesh nodes are the first ones
- 				if (id != 0)
- 				{
- 					boneIDAffectedIndices[id].push_back(i);
- 
- 					uint face = i / 3;
- 					if (std::find(boneIDAffectedFaces[id].begin(), boneIDAffectedFaces[id].end(), face) == boneIDAffectedFaces[id].end() && id != 0)
- 						boneIDAffectedFaces[id].push_back(face);
- 				}
- 			}
- 		}
+//  		map<uint8, vector<uint>> boneIDAffectedIndices;
+//  		map<uint8, vector<uint>> boneIDAffectedFaces;
+//  		for (uint i = 0; i < indexBuffer.size(); ++i)
+//  		{
+//  			for (uint j = 0; j < 4; ++j)
+//  			{
+//  				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
+//  				// bone id will never be 0, as the mesh nodes are the first ones
+//  				if (id != 0)
+//  				{
+//  					boneIDAffectedIndices[id].push_back(i);
+//  
+//  					uint face = i / 3;
+//  					if (std::find(boneIDAffectedFaces[id].begin(), boneIDAffectedFaces[id].end(), face) == boneIDAffectedFaces[id].end() && id != 0)
+//  						boneIDAffectedFaces[id].push_back(face);
+//  				}
+//  			}
+//  		}
 
 		// Max. Num. Bones per Batch 
 		uint32 batchStride = boneIds.size();
@@ -687,7 +698,7 @@ void PODWriter::writeMeshBlock(uint index)
 
 
 		// Interleaved Data List
-		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + boneWeights.xyzw + boneID.xyzw
+		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + boneID.wxyz + boneWeights.wxyz
 		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
 
 		writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
@@ -697,18 +708,19 @@ void PODWriter::writeMeshBlock(uint index)
 			writeBytes(m_fileStream, normalBuffer[i]);
 			writeBytes(m_fileStream, tangentBuffer[i]);
 			writeBytes(m_fileStream, uvBuffer[i]);
-			writeBytes(m_fileStream, boneBuffer[i].Weights);
 			//writeBytes(m_fileStream, boneBuffer[i].IDs);
 
+			//  into the "Bone Batch Index List" 
  			for (uint j = 0; j < 4; ++j)
  			{
  				uint8 boneID = boneBuffer[i].IDs[j];
  				auto it = std::find(boneIds.begin(), boneIds.end(), boneID);
  				boneID = it == boneIds.end() ? -1 : std::distance(boneIds.begin(), it);
  
-				//boneID = 0;
+				boneID = j;
 				writeBytes(m_fileStream, boneID);
  			}
+			writeBytes(m_fileStream, boneBuffer[i].Weights);
 		}
 		writeEndTag(pod::e_meshInterleavedDataList);
 
@@ -740,15 +752,15 @@ void PODWriter::writeMeshBlock(uint index)
 		offset += DataType::size(DataType::Float32) * 2;
 		writeEndTag(pod::e_meshUVWList);
 
-		writeStartTag(pod::e_meshBoneWeightList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 4, stride, offset);
-		offset += DataType::size(DataType::Float32) * 4;
-		writeEndTag(pod::e_meshBoneWeightList);
-
 		writeStartTag(pod::e_meshBoneIndexList, 0);
 		writeVertexAttributeOffset(m_fileStream, DataType::UInt8, 4, stride, offset);
 		offset += DataType::size(DataType::UInt8) * 4;
 		writeEndTag(pod::e_meshBoneIndexList);
+
+		writeStartTag(pod::e_meshBoneWeightList, 0);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 4, stride, offset);
+		offset += DataType::size(DataType::Float32) * 4;
+		writeEndTag(pod::e_meshBoneWeightList);
 	}
 	else
 	{
@@ -805,7 +817,7 @@ void PODWriter::writeNodeBlock(uint index)
 	writeStartTag(pod::e_sceneNode, 0);
 
 	// Node Index (only consider mesh, light and camera not supported yet)
-	int32 objectIndex = node->mNumMeshes > 0 ? index : -1;
+	int32 objectIndex = node->mNumMeshes == 1 ? index : -1;
 	writeStartTag(pod::e_nodeIndex, 4);
 	write4Bytes(m_fileStream, objectIndex);
 	writeEndTag(pod::e_nodeIndex);
@@ -817,17 +829,16 @@ void PODWriter::writeNodeBlock(uint index)
 	writeEndTag(pod::e_nodeName);
 
 	// Material Index (if the node is a mesh)
-	int32 matIndex = node->mNumMeshes > 0 ? node->mMeshes[0] : -1;
+	int32 matIndex = node->mNumMeshes == 1 ? node->mMeshes[0] : -1;
 	writeStartTag(pod::e_nodeMaterialIndex, 4);
 	write4Bytes(m_fileStream, matIndex);
 	writeEndTag(pod::e_nodeMaterialIndex);
 
 	// Parent Index 
-	aiNode* parent = node->mParent;
 	int32 parentIdx = -1;
 	for (uint32 i = 0; i < m_Nodes.size(); ++i)
 	{
-		if (m_Nodes[i] == parent)
+		if (m_Nodes[i] == node->mParent)
 		{
 			parentIdx = i;
 			break;
