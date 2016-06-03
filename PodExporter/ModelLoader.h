@@ -84,6 +84,7 @@ public:
 	uint getNumTextures() { return m_texturePaths.size(); }
 	const aiScene* getScene() { return m_aiScene; }
 	string& getTexture(uint index) { return m_texturePaths[index]; }
+	map<string, uint>& getBoneMap() { return m_BoneMapping; }
 
 private:
 	/*

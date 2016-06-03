@@ -621,18 +621,18 @@ void PODWriter::writeMeshBlock(uint index)
 
 		// simple version: 1 bone batch
 		vector<uint8> boneIds;
-		for (uint i = 0; i < indexBuffer.size(); ++i)
-		{
-			for (uint j = 0; j < 4; ++j)
-			{
-				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
-				// bone id will never be 0, as the mesh nodes are the first ones
-				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
-				{
-					boneIds.push_back(id);
-				}
-			}
-		}
+//		for (uint i = 0; i < indexBuffer.size(); ++i)
+//		{
+//			for (uint j = 0; j < 4; ++j)
+//			{
+//				uint8 id = boneBuffer[indexBuffer[i]].IDs[j];
+//				// bone id will never be 0, as the mesh nodes are the first ones
+//				if (std::find(boneIds.begin(), boneIds.end(), id) == boneIds.end() && id != 0)
+//				{
+//					boneIds.push_back(id);
+//				}
+//			}
+//		}
 // 		for (uint i = 0; i < meshData.numVertices; ++i)
 // 		{
 // 			for (uint j = 0; j < 4; ++j)
@@ -665,6 +665,13 @@ void PODWriter::writeMeshBlock(uint index)
 //  				}
 //  			}
 //  		}
+
+		map<string, uint> boneMap = m_modelLoader.getBoneMap();
+		aiMesh* pMesh = m_modelLoader.getScene()->mMeshes[index];
+		for (uint i = 0; i < pMesh->mNumBones; ++i)
+		{
+			boneIds.push_back(boneMap[pMesh->mBones[i]->mName.data]);
+		}
 
 		// Max. Num. Bones per Batch 
 		uint32 batchStride = boneIds.size();
@@ -702,7 +709,6 @@ void PODWriter::writeMeshBlock(uint index)
 		writeStartTag(pod::e_meshBoneOffsetPerBatch, 4);
 		write4Bytes(m_fileStream, batchOffset);
 		writeEndTag(pod::e_meshBoneOffsetPerBatch);
-
 
 		// Interleaved Data List
 		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + boneID.wxyz + boneWeights.wxyz

@@ -7,14 +7,14 @@ void ModelLoader::clear()
 	m_texturePaths.clear();
 
 	// delete the nodes that we created for the sub meshes
-	for each (aiNode* var in m_Nodes)
-	{
-		std::string name = std::string(var->mName.C_Str());
-		if (name.find("-submesh") != std::string::npos)
-		{
-			SAFE_DELETE(var);
-		}
-	}
+// 	for each (aiNode* var in m_Nodes)
+// 	{
+// 		std::string name = std::string(var->mName.C_Str());
+// 		if (name.find("-submesh") != std::string::npos)
+// 		{
+// 			SAFE_DELETE(var);
+// 		}
+// 	}
 	m_subMeshNodes.clear();
 	m_Nodes.clear();
 }
@@ -69,6 +69,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
 	{
 		ModelDataPtr md(new ModelData());
+		modelDataVector[i] = ModelDataPtr(md);
 
 		md->meshData = loadMesh(i, numVertices, numIndices);
 		md->materialData = loadMaterial(m_aiScene->mMaterials[m_aiScene->mMeshes[i]->mMaterialIndex]);
@@ -76,8 +77,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		numVertices += m_aiScene->mMeshes[i]->mNumVertices;
 		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
 		numFaces += m_aiScene->mMeshes[i]->mNumFaces;
-
-		modelDataVector[i] = ModelDataPtr(md);
 
 		aiNode* meshNode = getNode(md->meshData.name.c_str(), m_subMeshNodes);
 		
@@ -107,14 +106,14 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		cout << "\n" << i << " "  << m_Nodes[i]->mName.C_Str();
 	}
 
-	cout << "Loaded " << fileName << endl;
-	cout << "Model has " << m_aiScene->mNumMeshes << " meshes, " << numVertices << " vertices, " << numFaces << " faces. ";
-	if (m_BoneMapping.size())
-		cout << "Contains " << m_BoneMapping.size() << " bones. ";
-	if (m_aiScene->HasAnimations())
-	{
-		cout << "Contains " << m_aiScene->mAnimations[0]->mDuration << " seconds animation. ";
-	}
+// 	cout << "Loaded " << fileName << endl;
+// 	cout << "Model has " << m_aiScene->mNumMeshes << " meshes, " << numVertices << " vertices, " << numFaces << " faces. ";
+// 	if (m_BoneMapping.size())
+// 		cout << "Contains " << m_BoneMapping.size() << " bones. ";
+// 	if (m_aiScene->HasAnimations())
+// 	{
+// 		cout << "Contains " << m_aiScene->mAnimations[0]->mDuration << " seconds animation. ";
+// 	}
 
 	return modelDataVector;
 }
@@ -175,20 +174,6 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 {
 	const vec3 zero3D(0.0f, 0.0f, 0.0f);
 
-	// Populate the vertex attribute vectors
-	for (uint i = 0; i < mesh->mNumVertices; ++i)
-	{
-		vec3 pos = (mesh->mVertices[i]);
-		vec3 texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : zero3D;
-		vec3 normal = mesh->HasNormals() ? mesh->mNormals[i] : zero3D;
-		vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[i] : zero3D;
-
-		data.positions.push_back(pos);
-		data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
-		data.normals.push_back(normal);
-		data.tangents.push_back(tangent);
-	}
-
 	// Populate the index buffer
 	uint numNotsupportedFaces = 0;
 	for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
@@ -207,6 +192,63 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 			data.indices.push_back((uint16)face.mIndices[2]);
 		}
 	}
+
+	// Populate the vertex attribute vectors
+	if (mesh->HasBones())
+	{
+		// if the mesh has bones, read the vertices according to be bone order
+		vector<uint> sorted_vertexIds;
+		for (uint i = 0; i < mesh->mNumBones; ++i)
+		{
+			aiBone* pBone = mesh->mBones[i];
+			for (uint j = 0; j < pBone->mNumWeights; ++j)
+			{
+				uint vertexId = pBone->mWeights[j].mVertexId;
+				// avoid being added multiple times
+				if (std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), vertexId) == sorted_vertexIds.end())
+				{
+					vec3 pos = mesh->mVertices[vertexId];
+					vec3 texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][vertexId] : zero3D;
+					vec3 normal = mesh->HasNormals() ? mesh->mNormals[vertexId] : zero3D;
+					vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[vertexId] : zero3D;
+
+					data.positions.push_back(pos);
+					data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
+					data.normals.push_back(normal);
+					data.tangents.push_back(tangent);
+
+					sorted_vertexIds.push_back(vertexId);
+				}
+			}
+		}
+
+		vector<uint16> sorted_indexBuffer;
+		for (uint i = 0; i < data.indices.size(); ++i)
+		{
+			uint16 previousIndex = data.indices[i];
+			auto it = std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), previousIndex);
+			uint16 currentIndex = std::distance(sorted_vertexIds.begin(), it);
+			sorted_indexBuffer.push_back(currentIndex);
+		}
+
+		data.indices = sorted_indexBuffer;
+	}
+	else
+	{
+		for (uint i = 0; i < mesh->mNumVertices; ++i)
+		{
+			vec3 pos = mesh->mVertices[i];
+			vec3 texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : zero3D;
+			vec3 normal = mesh->HasNormals() ? mesh->mNormals[i] : zero3D;
+			vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[i] : zero3D;
+
+			data.positions.push_back(pos);
+			data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
+			data.normals.push_back(normal);
+			data.tangents.push_back(tangent);
+		}
+	}
+
 }
 
 void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
@@ -222,12 +264,12 @@ void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
 			aiNode* boneNode = getNode(boneName.c_str(), m_Nodes);
 			auto it = std::find(m_Nodes.begin(), m_Nodes.end(), boneNode);
 			boneIndex = std::distance(m_Nodes.begin(), it);
+			m_BoneMapping[boneName] = boneIndex;
 
 			Bone bi;
 			bi.m_ID = boneIndex;
 			bi.m_name = boneName;
 			bi.m_offsetMatrix = paiMesh->mBones[i]->mOffsetMatrix;
-			m_BoneMapping[boneName] = boneIndex;
 			m_BoneInfo.push_back(bi);
 		}
 		else
