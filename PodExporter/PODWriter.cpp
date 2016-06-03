@@ -357,9 +357,16 @@ void PODWriter::writeSceneBlock()
 	if (m_exportAnimations)
 	{
 		aiAnimation* animation = m_modelLoader.getScene()->mAnimations[0];
+		uint32 numPositionKeys(0), numRotationKeys(0), numScalingKeys(0);
+		for (uint i = 0; i < animation->mNumChannels; ++i)
+		{
+			numPositionKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumPositionKeys);
+			numRotationKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumRotationKeys);
+			numScalingKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumScalingKeys);
+		}
+
 		// Num. Frames
-		uint32 numFrames = std::max(std::max(animation->mChannels[0]->mNumPositionKeys,	animation->mChannels[0]->mNumRotationKeys),
-			animation->mChannels[0]->mNumScalingKeys);
+		uint32 numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
 
 		writeStartTag(pod::e_sceneNumFrames, 4);
 		write4Bytes(m_fileStream, numFrames);
