@@ -102,8 +102,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			loadBones(mesh, modelDataVector[i]->meshData);
 	}
 	
-	// remove unnecessary nodes
-	cleanUpNodes();
 	for (uint i = 0; i < m_Nodes.size(); ++i)
 	{
 		cout << "\n" << i << " "  << m_Nodes[i]->mName.C_Str();
@@ -394,8 +392,12 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
 {
 	if (!pNode) return;
 
+	// if the node is a child of the scene root, not a mesh node, and does not have any children, remove it
+	// e.g. light, camera, unnamed useless nodes, etc
+	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
+
 	// ignore the node with 0 or multiple meshes, the root node
-	if (pNode->mNumMeshes != 1 && pNode->mParent != NULL)
+	if (!isUselessNode && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
 	{
 		m_Nodes.push_back(pNode);
 	}
@@ -417,20 +419,6 @@ aiNode* ModelLoader::getNode(const char* meshName, vector<aiNode*>& source)
 	}
 
 	return NULL;
-}
-
-void ModelLoader::cleanUpNodes()
-{
-	for (uint i = 0; i < m_Nodes.size(); ++i)
-	{
-		// if the node is a child of the scene root, not a mesh node, and does not have any children, remove it
-		// e.g. light, camera, unnamed useless nodes, etc
-		aiNode* node = m_Nodes[i];
-		if (node->mParent == m_aiScene->mRootNode && node->mNumMeshes == 0 && node->mNumChildren == 0)
-		{
-			m_Nodes.erase(m_Nodes.begin() + i);
-		}
-	}
 }
 
 mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)

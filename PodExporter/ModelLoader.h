@@ -97,7 +97,6 @@ private:
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);
-	void cleanUpNodes();
 	mat4 calculateGlobalTransform(aiNode* pNode);
 
 	/*
