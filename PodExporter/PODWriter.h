@@ -7,7 +7,6 @@ using std::vector;
 namespace pvr {
 namespace assets {
 namespace assetWriters {
-class Model;
 
 class PODWriter
 {
