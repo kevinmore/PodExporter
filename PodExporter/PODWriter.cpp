@@ -377,6 +377,8 @@ void PODWriter::writeMeshBlock(uint index)
 	vector<vec3> positionBuffer = meshData.positions;
 	vector<vec3> normalBuffer = meshData.normals;
 	vector<vec3> tangentBuffer = meshData.tangents;
+	vector<vec3> bitangentBuffer = meshData.bitangents;
+	vector<color4D> colorBuffer = meshData.colors;
 	vector<vec2> uvBuffer = meshData.texCoords;
 	vector<VertexBoneData> boneBuffer = meshData.bones;
 
@@ -652,17 +654,33 @@ void PODWriter::writeMeshBlock(uint index)
 		writeEndTag(pod::e_meshBoneOffsetPerBatch);
 
 		// Interleaved Data List
-		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy + boneID.wxyz + boneWeights.wxyz
-		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]) + sizeof(boneBuffer[0]);
+		uint32 stride = sizeof(positionBuffer[0]) + sizeof(boneBuffer[0]);
+
+		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
+		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
+		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
+		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
+		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
 		writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			writeBytes(m_fileStream, positionBuffer[i]);
-			writeBytes(m_fileStream, normalBuffer[i]);
-			writeBytes(m_fileStream, tangentBuffer[i]);
-			writeBytes(m_fileStream, uvBuffer[i]);
-			//writeBytes(m_fileStream, boneBuffer[i].IDs);
+
+			if (normalBuffer.size() > 0)
+				writeBytes(m_fileStream, normalBuffer[i]);
+
+			if (tangentBuffer.size() > 0)
+				writeBytes(m_fileStream, tangentBuffer[i]);
+
+			if (bitangentBuffer.size() > 0)
+				writeBytes(m_fileStream, bitangentBuffer[i]);
+
+			if (uvBuffer.size() > 0)
+				writeBytes(m_fileStream, uvBuffer[i]);
+
+			if (colorBuffer.size() > 0)
+				writeBytes(m_fileStream, colorBuffer[i]);
 
 			//  into the "Bone Batch Index List" 
  			for (uint j = 0; j < 4; ++j)
@@ -691,20 +709,45 @@ void PODWriter::writeMeshBlock(uint index)
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshVertexList);
 
-		writeStartTag(pod::e_meshNormalList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshNormalList);
+		if (normalBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshNormalList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshNormalList);
+		}
 
-		writeStartTag(pod::e_meshTangentList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshTangentList);
+		if (tangentBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshTangentList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshTangentList);
+		}
 
-		writeStartTag(pod::e_meshUVWList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 2, stride, offset);
-		offset += DataType::size(DataType::Float32) * 2;
-		writeEndTag(pod::e_meshUVWList);
+		if (bitangentBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshBinormalList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshBinormalList);
+		}
+
+		if (uvBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshUVWList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 2, stride, offset);
+			offset += DataType::size(DataType::Float32) * 2;
+			writeEndTag(pod::e_meshUVWList);
+		}
+
+		if (colorBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshVertexColorList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 4, stride, offset);
+			offset += DataType::size(DataType::Float32) * 4;
+			writeEndTag(pod::e_meshVertexColorList);
+		}
 
 		writeStartTag(pod::e_meshBoneIndexList, 0);
 		writeVertexAttributeOffset(m_fileStream, DataType::UInt8, 4, stride, offset);
@@ -720,15 +763,33 @@ void PODWriter::writeMeshBlock(uint index)
 	{
 		// Interleaved Data List
 		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy
-		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(uvBuffer[0]);
+		uint32 stride = sizeof(positionBuffer[0]);
+
+		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
+		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
+		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
+		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
+		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
 		writeStartTag(pod::e_meshInterleavedDataList, stride * meshData.numVertices);
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			writeBytes(m_fileStream, positionBuffer[i]);
-			writeBytes(m_fileStream, normalBuffer[i]);
-			writeBytes(m_fileStream, tangentBuffer[i]);
-			writeBytes(m_fileStream, uvBuffer[i]);
+
+			if (normalBuffer.size() > 0)
+				writeBytes(m_fileStream, normalBuffer[i]);
+
+			if (tangentBuffer.size() > 0)
+				writeBytes(m_fileStream, tangentBuffer[i]);
+
+			if (bitangentBuffer.size() > 0)
+				writeBytes(m_fileStream, bitangentBuffer[i]);
+
+			if (uvBuffer.size() > 0)
+				writeBytes(m_fileStream, uvBuffer[i]);
+
+			if (colorBuffer.size() > 0)
+				writeBytes(m_fileStream, colorBuffer[i]);
 		}
 		writeEndTag(pod::e_meshInterleavedDataList);
 
@@ -744,20 +805,45 @@ void PODWriter::writeMeshBlock(uint index)
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshVertexList);
 
-		writeStartTag(pod::e_meshNormalList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshNormalList);
+		if (normalBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshNormalList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshNormalList);
+		}
 
-		writeStartTag(pod::e_meshTangentList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshTangentList);
+		if (tangentBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshTangentList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshTangentList);
+		}
 
-		writeStartTag(pod::e_meshUVWList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 2, stride, offset);
-		offset += DataType::size(DataType::Float32) * 2;
-		writeEndTag(pod::e_meshUVWList);
+		if (bitangentBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshBinormalList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshBinormalList);
+		}
+
+		if (uvBuffer.size() > 0) 
+		{
+			writeStartTag(pod::e_meshUVWList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 2, stride, offset);
+			offset += DataType::size(DataType::Float32) * 2;
+			writeEndTag(pod::e_meshUVWList);
+		}
+
+		if (colorBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshVertexColorList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 4, stride, offset);
+			offset += DataType::size(DataType::Float32) * 4;
+			writeEndTag(pod::e_meshVertexColorList);
+		}
 	}
 
 	writeEndTag(pod::e_sceneMesh);

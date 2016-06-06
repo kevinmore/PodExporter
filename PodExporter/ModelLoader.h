@@ -22,6 +22,8 @@ struct MeshData
 	vector<vec2> texCoords;
 	vector<vec3> normals;
 	vector<vec3> tangents;
+	vector<vec3> bitangents;
+	vector<color4D> colors;
 	vector<uint16> indices;
 	vector<VertexBoneData> bones;
 };
@@ -95,6 +97,7 @@ private:
 	TextureData  loadTexture(const aiMaterial* material);
 	void loadBones(const aiMesh* paiMesh, MeshData& data);
 	void readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data);
+	void fillOneVertex(unsigned int vertexIndex, const aiMesh* mesh, MeshData& data);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);

@@ -207,16 +207,7 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 				// avoid being added multiple times
 				if (std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), vertexId) == sorted_vertexIds.end())
 				{
-					vec3 pos = mesh->mVertices[vertexId];
-					vec3 texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][vertexId] : zero3D;
-					vec3 normal = mesh->HasNormals() ? mesh->mNormals[vertexId] : zero3D;
-					vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[vertexId] : zero3D;
-
-					data.positions.push_back(pos);
-					data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
-					data.normals.push_back(normal);
-					data.tangents.push_back(tangent);
-
+					fillOneVertex(vertexId, mesh, data);
 					sorted_vertexIds.push_back(vertexId);
 				}
 			}
@@ -237,18 +228,38 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 	{
 		for (uint i = 0; i < mesh->mNumVertices; ++i)
 		{
-			vec3 pos = mesh->mVertices[i];
-			vec3 texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : zero3D;
-			vec3 normal = mesh->HasNormals() ? mesh->mNormals[i] : zero3D;
-			vec3 tangent = mesh->HasTangentsAndBitangents() ? mesh->mTangents[i] : zero3D;
-
-			data.positions.push_back(pos);
-			data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
-			data.normals.push_back(normal);
-			data.tangents.push_back(tangent);
+			fillOneVertex(i, mesh, data);
 		}
 	}
 
+}
+
+void ModelLoader::fillOneVertex(unsigned int vertexIndex, const aiMesh* mesh, MeshData& data)
+{
+	data.positions.push_back(mesh->mVertices[vertexIndex]);
+
+	if (mesh->HasNormals())
+	{
+		data.normals.push_back(mesh->mNormals[vertexIndex]);
+	}
+
+	if (mesh->HasTangentsAndBitangents())
+	{
+		data.tangents.push_back(mesh->mTangents[vertexIndex]);
+		data.bitangents.push_back(mesh->mBitangents[vertexIndex]);
+	}
+
+	if (mesh->HasTextureCoords(0))
+	{
+		vec3 texCoord = mesh->mTextureCoords[0][vertexIndex];
+		data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
+	}
+
+	if (mesh->HasVertexColors(0))
+	{
+		color4D color = mesh->mColors[0][vertexIndex];
+		data.colors.push_back(color);
+	}
 }
 
 void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
