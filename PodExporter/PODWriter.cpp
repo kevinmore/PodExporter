@@ -5,17 +5,15 @@ to '\r\n', which produces one more byte than expected.                  */
 /************************************************************************/
 
 #include "PODWriter.h"
-#include "PVRAssets/FileIO/PODDefines.h"
-#include "PVRAssets/Model.h"
-#include "PVRCore/StringHash.h"
-#include "PVRCore/PVRCore.h"
 #include <cstdio>
 #include <algorithm>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale, glm::perspective
 
 namespace { // LOCAL FUNCTIONS
 using namespace pvr;
 using namespace assets;
-using namespace pvr::types;
 
 template <typename T>
 void writeBytes(fstream& stream, T& data, streamsize size = 0)
@@ -92,15 +90,6 @@ void writeByteArrayFromeString(fstream& stream, std::string& data)
 	writeBytes(stream, *end, 1);
 }
 
-void writeByteArrayFromeStringHash(fstream& stream, StringHash& data)
-{
-	writeByteArray(stream, data.c_str(), data.length());
-
-	// write the null terminator
-	const char* end = "\0";
-	writeBytes(stream, *end, 1);
-}
-
 void writeTag(fstream& stream, uint32 tagMask, uint32 identifier, uint32 dataLength)
 {
 	uint32 halfTag = identifier | tagMask;
@@ -113,14 +102,14 @@ void writeVertexIndexData(fstream& stream, std::vector<T>& data)
 {
 	// write block data type (UInt32 or UInt16)
 	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
-	DataType::Enum type;
+	pvr::DataType::Enum type;
 	switch (sizeof(T))
 	{
 	case 2:
-		type = DataType::UInt16;
+		type = pvr::DataType::UInt16;
 		break;
 	case 4:
-		type = DataType::UInt32;
+		type = pvr::DataType::UInt32;
 		break;
 	}
 	write4Bytes(stream, type);
@@ -141,7 +130,7 @@ void writeVertexIndexData(fstream& stream, std::vector<T>& data)
 }
 
 template <typename T>
-void writeVertexData(fstream& stream, DataType::Enum type, uint32 numComponents, uint32 stride, std::vector<T>& data)
+void writeVertexData(fstream& stream, pvr::DataType::Enum type, uint32 numComponents, uint32 stride, std::vector<T>& data)
 {
 	// write block data type
 	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
@@ -177,7 +166,7 @@ void writeVertexData(fstream& stream, DataType::Enum type, uint32 numComponents,
 	writeTag(stream, pod::c_endTagMask, pod::e_blockData, 0);
 }
 
-void writeVertexAttributeOffset(fstream& stream, DataType::Enum type, uint32 numComponents, uint32 stride, uint32 offset)
+void writeVertexAttributeOffset(fstream& stream, pvr::DataType::Enum type, uint32 numComponents, uint32 stride, uint32 offset)
 {
 	// write block data type
 	writeTag(stream, pod::c_startTagMask, pod::e_blockDataType, 4);
@@ -242,7 +231,18 @@ void PODWriter::exportModel(const std::string& path, ExportOptions options)
 
 	if (m_fileStream.is_open())
 	{
-		writeAllAssets();
+		// write pod version block
+		writeStartTag(pod::PODFormatVersion, pod::c_PODFormatVersionLength);
+		writeByteArray(m_fileStream, pod::c_PODFormatVersion, pod::c_PODFormatVersionLength);
+		writeEndTag(pod::PODFormatVersion);
+
+		// write scene block
+		// a block that contains only further nested blocks between its Start and End tags 
+		// will have a Length of zero. 
+		writeStartTag(pod::Scene, 0);
+		writeSceneBlock();
+		writeEndTag(pod::Scene);
+
 		m_fileStream.flush();
 		m_fileStream.close();
 	}
@@ -251,65 +251,6 @@ void PODWriter::exportModel(const std::string& path, ExportOptions options)
 		cout << "\nCannot open file: " << path;
 	}
 
-}
-
-bool PODWriter::addAssetToWrite(const Model & asset)
-{
-	if (m_assetsToWrite.size() >= 1)
-	{
-		return false;
-	}
-	m_assetsToWrite.push_back(&asset);
-	return true;
-}
-
-bool PODWriter::writeAllAssets()
-{
-	// write pod version block
-	writeStartTag(pod::PODFormatVersion, pod::c_PODFormatVersionLength);
-	writeByteArray(m_fileStream, pod::c_PODFormatVersion, pod::c_PODFormatVersionLength);
-	writeEndTag(pod::PODFormatVersion);
-
-	// write scene block
-	// a block that contains only further nested blocks between its Start and End tags 
-	// will have a Length of zero. 
-	writeStartTag(pod::Scene, 0);
-	writeSceneBlock();
-	writeEndTag(pod::Scene);
-
-	return true;
-}
-
-uint32 PODWriter::assetsAddedSoFar()
-{
-	return (uint32)m_assetsToWrite.size();
-}
-
-bool PODWriter::supportsMultipleAssets()
-{
-	return false;
-}
-
-bool PODWriter::canWriteAsset(const Model& asset)
-{
-	return true;
-}
-
-vector<string> PODWriter::getSupportedFileExtensions()
-{
-	vector<string> extensions;
-	extensions.push_back("pod");
-	return vector<string>(extensions);
-}
-
-string PODWriter::getWriterName()
-{
-	return "PowerVR assets::Model Writer";
-}
-
-string PODWriter::getWriterVersion()
-{
-	return "1.0.0";
 }
 
 void PODWriter::writeStartTag(uint32 identifier, uint32 dataLength)
@@ -836,9 +777,9 @@ void PODWriter::writeNodeBlock(uint index)
 	writeEndTag(pod::e_nodeIndex);
 
 	// Node Name
-	StringHash name(node->mName.C_Str());
+	std::string name(node->mName.C_Str());
 	writeStartTag(pod::e_nodeName, name.length() + 1);
-	writeByteArrayFromeStringHash(m_fileStream, name);
+	writeByteArrayFromeString(m_fileStream, name);
 	writeEndTag(pod::e_nodeName);
 
 	// Material Index (if the node is a mesh)
@@ -894,7 +835,7 @@ void PODWriter::writeNodeBlock(uint index)
 		for (uint i = 0; i < numFrames; ++i)
 		{
 			// position
-			glm::mat4 translation = glm::translate(glm::vec3(animation->mPositionKeys[i].mValue.x,
+			glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(animation->mPositionKeys[i].mValue.x,
 				animation->mPositionKeys[i].mValue.y, animation->mPositionKeys[i].mValue.z));
 
 			// rotation
@@ -902,7 +843,7 @@ void PODWriter::writeNodeBlock(uint index)
 				animation->mRotationKeys[i].mValue.y, animation->mRotationKeys[i].mValue.z));
 
 			// scale
-			glm::mat4 scaling = glm::scale(glm::vec3(animation->mScalingKeys[i].mValue.x,
+			glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(animation->mScalingKeys[i].mValue.x,
 				animation->mScalingKeys[i].mValue.y, animation->mScalingKeys[i].mValue.z));
 			
 			matrices.push_back(translation * rotation * scaling);
@@ -944,9 +885,9 @@ void PODWriter::writeMaterialBlock(uint index)
 	writeEndTag(pod::e_materialFlags);
 
 	// Material Name
-	StringHash name(matData.name);
+	std::string name(matData.name);
 	writeStartTag(pod::e_materialName, name.length() + 1);
-	writeByteArrayFromeStringHash(m_fileStream, name);
+	writeByteArrayFromeString(m_fileStream, name);
 	writeEndTag(pod::e_materialName);
 
 	// Texture Index
@@ -1147,9 +1088,9 @@ void PODWriter::writeTextureBlock(uint index)
 		path = path.substr(last_slash_idx + 1, path.length() - last_slash_idx);
 	}
 
-	StringHash name(path);
+	std::string name(path);
 	writeStartTag(pod::e_textureFilename, name.length() + 1);
-	writeByteArrayFromeStringHash(m_fileStream, name);
+	writeByteArrayFromeString(m_fileStream, name);
 	writeEndTag(pod::e_textureFilename);
 
 	writeEndTag(pod::e_sceneTexture);

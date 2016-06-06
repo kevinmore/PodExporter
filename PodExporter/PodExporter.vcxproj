@@ -74,12 +74,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\ThirdParty\assimp-3.1.1\include;..\ThirdParty\PowerVR_SDK_2016_R1.2\Framework;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\ThirdParty\assimp-3.1.1\include;..\ThirdParty\glm-0.9.7.5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>..\ThirdParty\assimp-3.1.1\lib;..\ThirdParty\PowerVR_SDK_2016_R1.2\Framework\Bin\WindowsVC2010\$(Configuration)_$(PlatformArchitecture);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp.lib;PVRCore.lib;PVRAssets.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\ThirdParty\assimp-3.1.1\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -96,14 +96,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\ThirdParty\assimp-3.1.1\include;..\ThirdParty\PowerVR_SDK_2016_R1.2\Framework;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\ThirdParty\assimp-3.1.1\include;..\ThirdParty\glm-0.9.7.5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>..\ThirdParty\assimp-3.1.1\lib;..\ThirdParty\PowerVR_SDK_2016_R1.2\Framework\Bin\WindowsVC2010\$(Configuration)_$(PlatformArchitecture);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp.lib;PVRCore.lib;PVRAssets.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\ThirdParty\assimp-3.1.1\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -129,6 +129,7 @@
     <ClInclude Include="Common.h" />
     <ClInclude Include="ModelConverter.h" />
     <ClInclude Include="ModelLoader.h" />
+    <ClInclude Include="PODDefines.h" />
     <ClInclude Include="PODWriter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

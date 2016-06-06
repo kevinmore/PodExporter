@@ -41,5 +41,8 @@
     <ClInclude Include="ModelConverter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PODDefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
