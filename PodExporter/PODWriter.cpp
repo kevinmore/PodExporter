@@ -851,8 +851,7 @@ void PODWriter::writeNodeBlock(uint index)
 	}
 	else
 	{
-		glm::mat4 identity;
-		matrices.push_back(identity);
+		matrices.push_back(glm::mat4(1.0f));
 	}
 
 	// Animation Flag
