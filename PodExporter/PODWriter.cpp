@@ -1086,6 +1086,14 @@ void PODWriter::writeTextureBlock(uint index)
 	{
 		path = path.substr(last_slash_idx + 1, path.length() - last_slash_idx);
 	}
+	else
+	{
+		const size_t last_backslash_idx = path.rfind('\\');
+		if (std::string::npos != last_backslash_idx)
+		{
+			path = path.substr(last_backslash_idx + 1, path.length() - last_backslash_idx);
+		}
+	}
 
 	std::string name(path);
 	writeStartTag(pod::e_textureFilename, name.length() + 1);

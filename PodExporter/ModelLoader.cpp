@@ -85,7 +85,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			meshNode = m_aiScene->mRootNode->FindNode(md->meshData.name.c_str());
 		}
 
-		md->meshData.unpackMatrix = calculateGlobalTransform(meshNode);
+		md->meshData.unpackMatrix = calculateGlobalTransform(meshNode).Inverse();
 
 		m_Nodes.push_back(meshNode);
 	}
