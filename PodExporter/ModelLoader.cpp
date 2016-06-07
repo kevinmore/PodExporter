@@ -194,7 +194,7 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 	}
 
 	// Populate the vertex attribute vectors
-	if (mesh->HasBones())
+	if (false)
 	{
 		// if the mesh has bones, read the vertices according to be bone order
 		vector<uint> sorted_vertexIds;
@@ -449,8 +449,21 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
 	// e.g. light, camera, unnamed useless nodes, etc
 	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
 
+	// if the node is an assimp generated intermediate nodes
+	std::string name = std::string(pNode ->mName.C_Str());
+	bool isIntermediate = name.find("_$AssimpFbx$") != std::string::npos;
+
+	if (isIntermediate)
+	{
+		// assign the parent ship
+		for (size_t i = 0; i < pNode->mNumChildren; ++i)
+		{
+			pNode->mChildren[i]->mParent = pNode->mParent;
+		}
+	}
+
 	// ignore the node with 0 or multiple meshes, the root node
-	if (!isUselessNode && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
+	if (!isUselessNode && !isIntermediate && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
 	{
 		m_Nodes.push_back(pNode);
 	}
