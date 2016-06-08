@@ -236,6 +236,12 @@ void PODWriter::exportModel(const std::string& path, ExportOptions options)
 		writeByteArray(m_fileStream, pod::c_PODFormatVersion, pod::c_PODFormatVersionLength);
 		writeEndTag(pod::PODFormatVersion);
 
+		// write history block
+		std::string msg = "Put your messages here...";
+		writeStartTag(pod::FileHistory, msg.length() + 1);
+		writeByteArrayFromeString(m_fileStream, msg);
+		writeEndTag(pod::FileHistory);
+
 		// write scene block
 		// a block that contains only further nested blocks between its Start and End tags 
 		// will have a Length of zero. 
@@ -265,6 +271,12 @@ void PODWriter::writeEndTag(uint32 identifier)
 
 void PODWriter::writeSceneBlock()
 {
+	// Clear Color
+	float clearColor[3] = {0.68f, 0.68f, 0.68f};
+	writeStartTag(pod::e_sceneClearColor, 3 * 4);
+	write4ByteArray(m_fileStream, clearColor, 3);
+	writeEndTag(pod::e_sceneClearColor);
+
 	// Num. Meshes
 	uint32 numMeshes = m_modelDataVec.size();
 	writeStartTag(pod::e_sceneNumMeshes, 4);
@@ -402,6 +414,7 @@ void PODWriter::writeMeshBlock(uint index)
 		// sort vertices and index buffer according to the bones affecting range
 		vector<vector<uint>> numAffectedVertices;
 		vector<uint> smallests, biggests;
+		vector<uint32> boneBatchIndexList;
 		for (uint i = 0; i < pMesh->mNumBones; ++i)
 		{
 			aiBone* pBone = pMesh->mBones[i];
@@ -421,15 +434,15 @@ void PODWriter::writeMeshBlock(uint index)
 			biggests.push_back(biggest);
 		}
 
-		std::sort(smallests.begin(), smallests.end());
+		//std::sort(smallests.begin(), smallests.end());
 
-		bool splitBones = false;
+		bool splitBones = true;
 		if (splitBones)
 		{
 			uint32 meshBoneCounts = boneIds.size();
 
 			// Max. Num. Bones per Batch 
-			uint32 batchStride = 9; // default number as pod specification
+			uint32 batchStride = 8; // default number
 			writeStartTag(pod::e_meshMaxNumBonesPerBatch, 4);
 			write4Bytes(m_fileStream, batchStride);
 			writeEndTag(pod::e_meshMaxNumBonesPerBatch);
@@ -472,12 +485,12 @@ void PODWriter::writeMeshBlock(uint index)
 				vector<uint32> batch;
 				uint32 actualNum = actualBoneCountsList[i];
 				for (uint j = 0; j < actualNum; ++j)
-					batch.push_back(boneIds[count++]);
+					boneBatchIndexList.push_back(boneIds[count++]);
 				for (uint j = actualNum; j < batchStride; ++j)
-					batch.push_back(0); // padding with 0
+					boneBatchIndexList.push_back(0); // padding with 0
 
-				write4ByteArrayFromVector(m_fileStream, batch);
 			}
+			write4ByteArrayFromVector(m_fileStream, boneBatchIndexList);
 			writeEndTag(pod::e_meshBoneBatchIndexList);
 
 			// Bone Offset per Batch
@@ -488,7 +501,7 @@ void PODWriter::writeMeshBlock(uint index)
 			for (uint i = 0; i < batchesCount; ++i)
 			{
 				uint32 numBones = actualBoneCountsList[i];
-				offsetsList.push_back(indexOffset += 500); // need fix
+				offsetsList.push_back(indexOffset); // need fix
 			}
 
 			writeStartTag(pod::e_meshBoneOffsetPerBatch, 4 * batchesCount);
@@ -571,10 +584,15 @@ void PODWriter::writeMeshBlock(uint index)
  			for (uint j = 0; j < 4; ++j)
  			{
  				uint8 boneID = boneBuffer[i].IDs[j];
- 				auto it = std::find(boneIds.begin(), boneIds.end(), boneID);
- 				boneID = it == boneIds.end() ? -1 : std::distance(boneIds.begin(), it);
- 
-				//boneID = j;
+				if (boneID == 0)
+				{
+					boneID = -1;
+				}
+				else
+				{
+					auto it = std::find(boneBatchIndexList.begin(), boneBatchIndexList.end(), (uint32)boneID);
+					boneID = it == boneBatchIndexList.end() ? -1 : std::distance(boneBatchIndexList.begin(), it);
+				}
 				writeBytes(m_fileStream, boneID);
  			}
 			writeBytes(m_fileStream, boneBuffer[i].Weights);
@@ -817,7 +835,21 @@ void PODWriter::writeNodeBlock(uint index)
 			glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(animation->mScalingKeys[i].mValue.x,
 				animation->mScalingKeys[i].mValue.y, animation->mScalingKeys[i].mValue.z));
 			
+			mat4 globalTransform;
+			while (node->mParent)
+			{
+				globalTransform = node->mParent->mTransformation * globalTransform;
+				node = node->mParent;
+			}
+
+			glm::mat4 t = glm::mat4(
+				globalTransform.a1, globalTransform.a2, globalTransform.a3, globalTransform.a4, 
+				globalTransform.b1, globalTransform.b2, globalTransform.b3, globalTransform.b4,
+				globalTransform.c1, globalTransform.c2, globalTransform.c3, globalTransform.c4,
+				globalTransform.d1, globalTransform.d2, globalTransform.d3, globalTransform.d4);
+
 			matrices.push_back(translation * rotation * scaling);
+			//matrices.push_back(scaling * rotation * translation);
 		}
 	}
 	else
