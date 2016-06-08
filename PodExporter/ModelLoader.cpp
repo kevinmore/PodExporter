@@ -101,20 +101,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			loadBones(mesh, modelDataVector[i]->meshData);
 	}
 	
-	for (uint i = 0; i < m_Nodes.size(); ++i)
-	{
-		cout << "\n" << i << " "  << m_Nodes[i]->mName.C_Str();
-	}
-
-// 	cout << "Loaded " << fileName << endl;
-// 	cout << "Model has " << m_aiScene->mNumMeshes << " meshes, " << numVertices << " vertices, " << numFaces << " faces. ";
-// 	if (m_BoneMapping.size())
-// 		cout << "Contains " << m_BoneMapping.size() << " bones. ";
-// 	if (m_aiScene->HasAnimations())
-// 	{
-// 		cout << "Contains " << m_aiScene->mAnimations[0]->mDuration << " seconds animation. ";
-// 	}
-
 	return modelDataVector;
 }
 
@@ -172,8 +158,6 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 
 void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data)
 {
-	const vec3 zero3D(0.0f, 0.0f, 0.0f);
-
 	// Populate the index buffer
 	uint numNotsupportedFaces = 0;
 	for (unsigned int i = 0; i < mesh->mNumFaces; ++i)

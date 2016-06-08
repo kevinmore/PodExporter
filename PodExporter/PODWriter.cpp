@@ -320,29 +320,37 @@ void PODWriter::writeSceneBlock()
 		writeEndTag(pod::e_sceneFPS);
 	}
 
+	// Node Block
+	cout << "\n\nExporting Nodes..." << endl;
+	for (uint32 i = 0; i < numNodes; ++i)
+	{
+		cout << "\n" << i << " " << m_Nodes[i]->mName.C_Str();
+		writeNodeBlock(i);
+	}
+
 	// Mesh Block
+	cout << "\n\nExporting Meshes..." << endl;
 	for (uint i = 0; i < m_modelDataVec.size(); ++i)
 	{
 		writeMeshBlock(i);
 	}
 
-	// Node Block
-	for (uint32 i = 0; i < numNodes; ++i)
-	{
-		writeNodeBlock(i);
-	}
-
 	// Material Block
+	cout << "\n\nExporting Materials..." << endl;
 	for (uint i = 0; i < m_modelDataVec.size(); ++i)
 	{
 		writeMaterialBlock(i);
 	}
 
 	// Texture Block
+	cout << "\n\nExporting Textures..." << endl;
 	for (uint32 i = 0; i < numTextures; ++i)
 	{
 		writeTextureBlock(i);
 	}
+
+
+	cout << "\n\nDone Exporting." << endl;
 }
 
 void PODWriter::writeMeshBlock(uint index)
@@ -408,7 +416,7 @@ void PODWriter::writeMeshBlock(uint index)
 				smallest = std::min(smallest, pBone->mWeights[j].mVertexId);
 				biggest = std::max(biggest, pBone->mWeights[j].mVertexId);
 			}
-			cout << endl;
+			//cout << endl;
 			smallests.push_back(smallest);
 			biggests.push_back(biggest);
 		}

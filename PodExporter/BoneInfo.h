@@ -20,8 +20,10 @@ struct VertexBoneData
 
 	void AddBoneData(uint8_t BoneID, float Weight)
 	{
-		for (uint i = 0; i < ARRAY_SIZE_IN_ELEMENTS(IDs); ++i) {
-			if (Weights[i] == 0.0) {
+		for (uint i = 0; i < ARRAY_SIZE_IN_ELEMENTS(IDs); ++i) 
+		{
+			if (Weights[i] == 0.0) 
+			{
 				IDs[i] = BoneID;
 				Weights[i] = Weight;
 				return;
