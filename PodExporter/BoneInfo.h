@@ -4,7 +4,7 @@
 
 struct VertexBoneData
 {
-	uint8_t IDs[NUM_BONES_PER_VEREX];
+	unsigned short IDs[NUM_BONES_PER_VEREX];
 	float Weights[NUM_BONES_PER_VEREX];
 
 	VertexBoneData()
@@ -18,7 +18,7 @@ struct VertexBoneData
 		ZERO_MEM(Weights);
 	}
 
-	void AddBoneData(uint8_t BoneID, float Weight)
+	void AddBoneData(unsigned short BoneID, float Weight)
 	{
 		for (uint i = 0; i < ARRAY_SIZE_IN_ELEMENTS(IDs); ++i) 
 		{

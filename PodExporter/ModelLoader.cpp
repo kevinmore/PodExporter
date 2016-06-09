@@ -171,44 +171,44 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 		}
 		else
 		{
-			data.indices.push_back((uint16)face.mIndices[0]);
-			data.indices.push_back((uint16)face.mIndices[1]);
-			data.indices.push_back((uint16)face.mIndices[2]);
+			data.indices.push_back((unsigned int)face.mIndices[0]);
+			data.indices.push_back((unsigned int)face.mIndices[1]);
+			data.indices.push_back((unsigned int)face.mIndices[2]);
 		}
 	}
 
 	// Populate the vertex attribute vectors
-	if (false)
-	{
-		// if the mesh has bones, read the vertices according to be bone order
-		vector<uint> sorted_vertexIds;
-		for (uint i = 0; i < mesh->mNumBones; ++i)
-		{
-			aiBone* pBone = mesh->mBones[i];
-			for (uint j = 0; j < pBone->mNumWeights; ++j)
-			{
-				uint vertexId = pBone->mWeights[j].mVertexId;
-				// avoid being added multiple times
-				if (std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), vertexId) == sorted_vertexIds.end())
-				{
-					fillOneVertex(vertexId, mesh, data);
-					sorted_vertexIds.push_back(vertexId);
-				}
-			}
-		}
-
-		vector<uint16> sorted_indexBuffer;
-		for (uint i = 0; i < data.indices.size(); ++i)
-		{
-			uint16 previousIndex = data.indices[i];
-			auto it = std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), previousIndex);
-			uint16 currentIndex = std::distance(sorted_vertexIds.begin(), it);
-			sorted_indexBuffer.push_back(currentIndex);
-		}
-
-		data.indices = sorted_indexBuffer;
-	}
-	else
+// 	if (false)
+// 	{
+// 		// if the mesh has bones, read the vertices according to be bone order
+// 		vector<uint> sorted_vertexIds;
+// 		for (uint i = 0; i < mesh->mNumBones; ++i)
+// 		{
+// 			aiBone* pBone = mesh->mBones[i];
+// 			for (uint j = 0; j < pBone->mNumWeights; ++j)
+// 			{
+// 				uint vertexId = pBone->mWeights[j].mVertexId;
+// 				// avoid being added multiple times
+// 				if (std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), vertexId) == sorted_vertexIds.end())
+// 				{
+// 					fillOneVertex(vertexId, mesh, data);
+// 					sorted_vertexIds.push_back(vertexId);
+// 				}
+// 			}
+// 		}
+// 
+// 		vector<uint16> sorted_indexBuffer;
+// 		for (uint i = 0; i < data.indices.size(); ++i)
+// 		{
+// 			uint16 previousIndex = data.indices[i];
+// 			auto it = std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), previousIndex);
+// 			uint16 currentIndex = std::distance(sorted_vertexIds.begin(), it);
+// 			sorted_indexBuffer.push_back(currentIndex);
+// 		}
+// 
+// 		data.indices = sorted_indexBuffer;
+// 	}
+// 	else
 	{
 		for (uint i = 0; i < mesh->mNumVertices; ++i)
 		{
@@ -251,7 +251,7 @@ void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
 	data.bones.resize(paiMesh->mNumVertices);
 	for (uint i = 0; i < paiMesh->mNumBones; ++i)
 	{
-		uint8_t boneIndex = 0;
+		unsigned short boneIndex = 0;
 		string boneName(paiMesh->mBones[i]->mName.data);
 		if (m_BoneMapping.find(boneName) == m_BoneMapping.end())
 		{

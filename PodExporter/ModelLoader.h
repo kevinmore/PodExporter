@@ -3,7 +3,6 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 
-typedef unsigned short uint16;
 struct MeshData
 {
 	string name;
@@ -24,7 +23,7 @@ struct MeshData
 	vector<vec3> tangents;
 	vector<vec3> bitangents;
 	vector<color4D> colors;
-	vector<uint16> indices;
+	vector<unsigned int> indices;
 	vector<VertexBoneData> bones;
 };
 
@@ -86,7 +85,7 @@ public:
 	uint getNumTextures() { return m_texturePaths.size(); }
 	const aiScene* getScene() { return m_aiScene; }
 	string& getTexture(uint index) { return m_texturePaths[index]; }
-	map<string, uint>& getBoneMap() { return m_BoneMapping; }
+	map<string, unsigned short>& getBoneMap() { return m_BoneMapping; }
 
 private:
 	/*
@@ -115,7 +114,7 @@ private:
 	// make the importer as member valuable, so that it does not call FreeScene until the class is destructed
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
-	map<string, uint> m_BoneMapping; // maps a bone name to its index
+	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<string> m_texturePaths;

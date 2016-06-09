@@ -20,6 +20,7 @@ typedef aiColor4D color4D;
 
 #define ZERO_MEM(a) memset(a, 0, sizeof(a))
 #define ARRAY_SIZE_IN_ELEMENTS(a) (sizeof(a)/sizeof(*a))
+#define FREE(X)		{ if(X) { free(X); (X) = 0; } }
 #define SAFE_DELETE(MEM)                \
 {                                   \
 	if ((MEM)) {                    \

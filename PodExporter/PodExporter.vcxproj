@@ -124,6 +124,8 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="PODWriter.cpp" />
+    <ClCompile Include="PVRTBoneBatches.cpp" />
+    <ClCompile Include="PVRTVertex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BoneInfo.h" />
@@ -132,6 +134,8 @@
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="PODDefines.h" />
     <ClInclude Include="PODWriter.h" />
+    <ClInclude Include="PVRTBoneBatches.h" />
+    <ClInclude Include="PVRTVertex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

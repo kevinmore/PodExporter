@@ -24,6 +24,12 @@
     <ClCompile Include="PODWriter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PVRTBoneBatches.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PVRTVertex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BoneInfo.h">
@@ -42,6 +48,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PODDefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PVRTBoneBatches.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PVRTVertex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
