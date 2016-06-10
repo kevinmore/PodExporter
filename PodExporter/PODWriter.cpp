@@ -8,11 +8,8 @@ to '\r\n', which produces one more byte than expected.                  */
 #include "PVRTBoneBatches.h"
 #include <cstdio>
 #include <algorithm>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
-#define  MAX_NUM_BONES_PER_BATCH 8
+#define  MAX_NUM_BONES_PER_BATCH 9
 #define HISTORY_MESSAGE "Hello POD!" // Put your messages here...
 
 namespace { // LOCAL FUNCTIONS
@@ -194,10 +191,10 @@ void writeVertexAttributeOffset(fstream& stream, pvr::DataType::Enum type, uint3
 }
 
 template <typename T>
-void addByteIntoVector(T& data, vector<byte>& targetVector)
+void addByteIntoVector(T& data, vector<char>& targetVector)
 {
-	byte *temp;
-	temp = reinterpret_cast<byte*>(&data);
+	char *temp;
+	temp = reinterpret_cast<char*>(&data);
 	for (uint i = 0; i < sizeof(T); ++i)
 		targetVector.push_back(temp[i]);
 }
@@ -212,6 +209,7 @@ namespace assetWriters {
 PODWriter::PODWriter(ModelLoader& loader)
 	: m_modelLoader(loader)
 	, m_Nodes(loader.getNodeList())
+	, m_matrixMap(loader.getBoneOffsetMatrixMap())
 {
 }
 
@@ -311,6 +309,7 @@ void PODWriter::writeSceneBlock()
 	write4Bytes(m_fileStream, numMaterials);
 	writeEndTag(pod::e_sceneNumMaterials);
 
+	uint32 numFrames = 0;
 	if (m_exportAnimations)
 	{
 		aiAnimation* animation = m_modelLoader.getScene()->mAnimations[0];
@@ -318,37 +317,28 @@ void PODWriter::writeSceneBlock()
 		for (uint i = 0; i < animation->mNumChannels; ++i)
 		{
 			numPositionKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumPositionKeys);
-			numRotationKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumRotationKeys);
-			numScalingKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumScalingKeys);
+			numRotationKeys = std::max(numRotationKeys, animation->mChannels[i]->mNumRotationKeys);
+			numScalingKeys = std::max(numScalingKeys, animation->mChannels[i]->mNumScalingKeys);
 		}
 
 		// Num. Frames
-		uint32 numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
-
+		numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
 		writeStartTag(pod::e_sceneNumFrames, 4);
 		write4Bytes(m_fileStream, numFrames);
 		writeEndTag(pod::e_sceneNumFrames);
 
 		// FPS (30 fps by default)
 		uint32 fps = numFrames / static_cast<uint32>(animation->mDuration);
+
+		//special case
+		if (fps == 0)
+		{
+			fps = animation->mTicksPerSecond != 0 ? uint32(animation->mTicksPerSecond) : 30;
+		}
+
 		writeStartTag(pod::e_sceneFPS, 4);
 		write4Bytes(m_fileStream, fps);
 		writeEndTag(pod::e_sceneFPS);
-	}
-
-	// Node Block
-	cout << "\n\nExporting Nodes..." << endl;
-	for (uint32 i = 0; i < numNodes; ++i)
-	{
-		cout << "\n" << i << " " << m_Nodes[i]->mName.C_Str();
-		writeNodeBlock(i);
-	}
-
-	// Mesh Block
-	cout << "\n\nExporting Meshes..." << endl;
-	for (uint i = 0; i < m_modelDataVec.size(); ++i)
-	{
-		writeMeshBlock(i);
 	}
 
 	// Material Block
@@ -365,6 +355,25 @@ void PODWriter::writeSceneBlock()
 		writeTextureBlock(i);
 	}
 
+	// Mesh Block
+	cout << "\n\nExporting Meshes..." << endl;
+	for (uint i = 0; i < m_modelDataVec.size(); ++i)
+	{
+		writeMeshBlock(i);
+	}
+
+	// Node Block
+	cout << "\n\nExporting Nodes..." << endl;
+	//for (uint i = 0; i < numFrames; ++i)
+	//{
+	//	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
+	//	calcFinalTransforms(anim, i, m_Nodes[numMeshNodes], glm::mat4(1.0f));
+	//}
+
+	for (uint32 i = 0; i < numNodes; ++i)
+	{
+		writeNodeBlock(i);
+	}
 
 	cout << "\n\nDone Exporting." << endl;
 }
@@ -377,9 +386,9 @@ void PODWriter::writeMeshBlock(uint index)
 	writeStartTag(pod::e_sceneMesh, 0);
 
 	// Unpack Matrix
-	writeStartTag(pod::e_meshUnpackMatrix, 4 * 16);
-	writeBytes(m_fileStream, meshData.unpackMatrix.a1, 4 * 16);
-	writeEndTag(pod::e_meshUnpackMatrix);
+	//writeStartTag(pod::e_meshUnpackMatrix, 4 * 16);
+	//writeBytes(m_fileStream, meshData.unpackMatrix.a1, 4 * 16);
+	//writeEndTag(pod::e_meshUnpackMatrix);
 
 	// Num. Faces
 	writeStartTag(pod::e_meshNumFaces, 4);
@@ -414,7 +423,7 @@ void PODWriter::writeMeshBlock(uint index)
 		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
 		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
-		vector<byte> interleavedDataList;
+		vector<char> interleavedDataList;
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			addByteIntoVector(positionBuffer[i], interleavedDataList);
@@ -443,7 +452,7 @@ void PODWriter::writeMeshBlock(uint index)
 
 		int idOffset = stride - sizeof(boneBuffer[0]);
 		boneBatches.Create(&nVtxOut, &pVtxOut, indexBuffer.data(), meshData.numVertices,
-			(char*)interleavedDataList.data(), stride,
+			interleavedDataList.data(), stride,
 			idOffset + 4 * sizeof(uint16), EPODDataFloat,
 			idOffset, EPODDataUnsignedShort,
 			meshData.numFaces, MAX_NUM_BONES_PER_BATCH, NUM_BONES_PER_VEREX);
@@ -649,6 +658,7 @@ void PODWriter::writeMeshBlock(uint index)
 void PODWriter::writeNodeBlock(uint index)
 {
 	aiNode* node = m_Nodes[index];
+	cout << "\n" << index << " " << node->mName.C_Str();
 
 	// write node block
 	writeStartTag(pod::e_sceneNode, 0);
@@ -695,7 +705,7 @@ void PODWriter::writeNodeBlock(uint index)
 	// Node Animation
 	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
 	aiNodeAnim* animation = NULL;
-	for (uint i = 0; i <anim->mNumChannels; ++i)
+	for (uint i = 0; i < anim->mNumChannels; ++i)
 	{
 		if (anim->mChannels[i]->mNodeName == node->mName)
 		{
@@ -703,54 +713,77 @@ void PODWriter::writeNodeBlock(uint index)
 			break;
 		}
 	}
-
-	// Animation transform matrix list
+	vector<glm::vec3> positions;
+	vector<glm::quat> rotations;
+	vector<glm::vec3> scalings;
 	vector<glm::mat4> matrices;
-
 	uint32 flag = 0x00; // no animation
-
-	if (animation)
-	{
-		flag = 0x08; // using matrix
-		uint numFrames = std::min(animation->mNumPositionKeys, 
-			std::min(animation->mNumRotationKeys, animation->mNumScalingKeys));
-
-		for (uint i = 0; i < numFrames; ++i)
-		{
-			// position
-			glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(animation->mPositionKeys[i].mValue.x,
+ 	if (animation)
+ 	{
+ 		flag = 0x08; // using matrix
+ 		uint numFrames = std::max(animation->mNumPositionKeys,
+ 			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
+		
+ 		for (uint i = 0; i < animation->mNumPositionKeys; ++i)
+ 		{
+			positions.push_back(glm::vec3(animation->mPositionKeys[i].mValue.x,
 				animation->mPositionKeys[i].mValue.y, animation->mPositionKeys[i].mValue.z));
-
-			// rotation
-			glm::mat4 rotation = glm::mat4_cast(glm::quat(animation->mRotationKeys[i].mValue.w, animation->mRotationKeys[i].mValue.x,
+ 		}
+ 
+ 		for (uint i = 0; i < animation->mNumRotationKeys; ++i)
+ 		{
+			rotations.push_back(glm::quat(animation->mRotationKeys[i].mValue.w, animation->mRotationKeys[i].mValue.x,
 				animation->mRotationKeys[i].mValue.y, animation->mRotationKeys[i].mValue.z));
-
-			// scale
-			glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(animation->mScalingKeys[i].mValue.x,
+ 		}
+ 
+ 		for (uint i = 0; i < animation->mNumScalingKeys; ++i)
+ 		{
+			scalings.push_back(glm::vec3(animation->mScalingKeys[i].mValue.x,
 				animation->mScalingKeys[i].mValue.y, animation->mScalingKeys[i].mValue.z));
-			
-			mat4 globalTransform;
-			while (node->mParent)
+ 		}
+
+ 		for (uint i = 0; i < numFrames; ++i)
+ 		{
+			glm::mat4 translationM, rotationM, scalingM;
+
+			// position
+			if (i < positions.size())
 			{
-				globalTransform = node->mParent->mTransformation * globalTransform;
-				node = node->mParent;
+				translationM = glm::translate(glm::mat4(1.0f), positions[i]);
+			}
+			else
+			{
+				// pick the last one
+				translationM = glm::translate(glm::mat4(1.0f), positions[positions.size() - 1]);
 			}
 
-			glm::mat4 t = glm::mat4(
-				globalTransform.a1, globalTransform.a2, globalTransform.a3, globalTransform.a4, 
-				globalTransform.b1, globalTransform.b2, globalTransform.b3, globalTransform.b4,
-				globalTransform.c1, globalTransform.c2, globalTransform.c3, globalTransform.c4,
-				globalTransform.d1, globalTransform.d2, globalTransform.d3, globalTransform.d4);
+			// rotation
+			if (i < rotations.size())
+			{
+				rotationM = glm::mat4_cast(rotations[i]);
+			}
+			else
+			{
+				// pick the last one
+				rotationM = glm::mat4_cast(rotations[rotations.size() - 1]);
+			}
+ 		
+			// rotation
+			if (i < scalings.size())
+			{
+				scalingM = glm::scale(glm::mat4(1.0f), scalings[i]);
+			}
+			else
+			{
+				// pick the last one
+				scalingM = glm::scale(glm::mat4(1.0f), scalings[scalings.size() - 1]);
+			}
 
-			glm::mat4 nodeTransformation = translation * rotation * scaling;
-
-			// Matrices are stored "Row Major" in memory, and used "Column Major" mathematically. 
-			// All glm matrix types are column-major rather than row-major.
-			glm::mat4 transposed = glm::transpose(nodeTransformation);
-			matrices.push_back(nodeTransformation);
-		}
-	}
-	else
+			mat4 boneOffset = m_matrixMap[node];
+			matrices.push_back(translationM * rotationM * scalingM);
+ 		}
+ 	}
+ 	else
 	{
 		matrices.push_back(glm::mat4(1.0f));
 	}
@@ -1004,6 +1037,61 @@ void PODWriter::writeTextureBlock(uint index)
 	writeEndTag(pod::e_sceneTexture);
 }
 
+/*
+aiNodeAnim* PODWriter::findNodeAnimation(aiAnimation* pAnimation, aiString& nodeName)
+{
+	for (uint i = 0; i < pAnimation->mNumChannels; ++i)
+	{
+		aiNodeAnim* pNodeAnim = pAnimation->mChannels[i];
+		if (pNodeAnim->mNodeName == nodeName)
+		{
+			return pNodeAnim;
+		}
+	}
+
+	return NULL;
+}
+
+void PODWriter::calcFinalTransforms(aiAnimation* pAnimation, uint currentFrame, aiNode* pNode, glm::mat4& parentTransform)
+{
+	aiNodeAnim* pNodeAnim = findNodeAnimation(pAnimation, pNode->mName);
+
+	glm::mat4 nodeTransformation = toGLMMatrix4x4(pNode->mTransformation);
+
+	if (pNodeAnim)
+	{
+		// position
+		glm::mat4 translation = glm::translate(glm::mat4(1.0f), glm::vec3(pNodeAnim->mPositionKeys[currentFrame].mValue.x,
+			pNodeAnim->mPositionKeys[currentFrame].mValue.y, pNodeAnim->mPositionKeys[currentFrame].mValue.z));
+
+		// rotation
+		glm::mat4 rotation = glm::mat4_cast(glm::quat(pNodeAnim->mRotationKeys[currentFrame].mValue.w, pNodeAnim->mRotationKeys[currentFrame].mValue.x,
+			pNodeAnim->mRotationKeys[currentFrame].mValue.y, pNodeAnim->mRotationKeys[currentFrame].mValue.z));
+
+		// scale
+		glm::mat4 scaling = glm::scale(glm::mat4(1.0f), glm::vec3(pNodeAnim->mScalingKeys[currentFrame].mValue.x,
+			pNodeAnim->mScalingKeys[currentFrame].mValue.y, pNodeAnim->mScalingKeys[currentFrame].mValue.z));
+
+		nodeTransformation = translation * rotation * scaling;
+	}
+
+	glm::mat4 globalTransformation = parentTransform * nodeTransformation;
+	map<aiNode*, mat4> matrixMap = m_modelLoader.getBoneOffsetMatrixMap();
+	mat4 offsetMatrix;
+	if (matrixMap.find(std::string(pNode->mName.C_Str())) != matrixMap.end())
+	{
+		offsetMatrix = matrixMap[std::string(pNode->mName.C_Str())];
+	}
+
+	//m_nodeAnimationsList[pNode].push_back( globalTransformation * toGLMMatrix4x4(offsetMatrix));
+	m_nodeAnimationsList[pNode].push_back(nodeTransformation * toGLMMatrix4x4(offsetMatrix));
+
+	for (uint i = 0; i < pNode->mNumChildren; ++i)
+	{
+		calcFinalTransforms(pAnimation, currentFrame, pNode->mChildren[i], globalTransformation);
+	}
+}
+*/
 }
 }
 }

@@ -6,8 +6,11 @@
 #include <stdlib.h>
 #include <time.h>
 #include <vector>
+#include <map>
 #include <assimp/types.h>
-using namespace std;
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 typedef unsigned int uint;
 typedef aiMatrix3x3 mat3;
@@ -35,4 +38,16 @@ typedef aiColor4D color4D;
 	delete[] ((MEM));           \
 	(MEM) = NULL;               \
 	}                               \
+}
+
+namespace 
+{
+	glm::mat4 toGLMMatrix4x4(aiMatrix4x4& m)
+	{
+		return glm::mat4(
+			m.a1, m.a2, m.a3, m.a4,
+			m.b1, m.b2, m.b3, m.b4,
+			m.c1, m.c2, m.c3, m.c4,
+			m.d1, m.d2, m.d3, m.d4);
+	}
 }

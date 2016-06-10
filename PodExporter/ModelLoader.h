@@ -1,7 +1,42 @@
 #pragma once
-#include "Skeleton.h"
+#include "Common.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
+#define NUM_BONES_PER_VEREX 4
+using namespace std;
+
+struct VertexBoneData
+{
+	unsigned short IDs[NUM_BONES_PER_VEREX];
+	float Weights[NUM_BONES_PER_VEREX];
+
+	VertexBoneData()
+	{
+		Reset();
+	};
+
+	void Reset()
+	{
+		ZERO_MEM(IDs);
+		ZERO_MEM(Weights);
+	}
+
+	void AddBoneData(unsigned short BoneID, float Weight)
+	{
+		for (uint i = 0; i < ARRAY_SIZE_IN_ELEMENTS(IDs); ++i)
+		{
+			if (Weights[i] == 0.0)
+			{
+				IDs[i] = BoneID;
+				Weights[i] = Weight;
+				return;
+			}
+		}
+
+		// should never get here - more bones than we have space for
+		assert(0);
+	}
+};
 
 struct MeshData
 {
@@ -74,19 +109,17 @@ public:
 		MAX_QUALITY
 	};
 
-	/*
-	*	This is the core functionality
-	*/
 	vector<ModelDataPtr> loadModel(const string& filename, LoadingQuality flag = MAX_QUALITY);
+
 	string& getFileNmae() { return m_fileName; }
-	vector<Bone>& getBoneList() { return m_BoneInfo; }
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
 	uint getNumNodes() { return m_Nodes.size();  }
 	uint getNumTextures() { return m_texturePaths.size(); }
 	const aiScene* getScene() { return m_aiScene; }
 	string& getTexture(uint index) { return m_texturePaths[index]; }
 	map<string, unsigned short>& getBoneMap() { return m_BoneMapping; }
-
+	map<aiNode*, mat4>& getBoneOffsetMatrixMap() { return m_BoneOffsetMatrixMapping; }
+	mat4 getGlobalInverseTransfromMatrix() { return m_GlobalInverseTransform; }
 private:
 	/*
 	*	Methods to process the model file
@@ -114,10 +147,10 @@ private:
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
+	map<aiNode*, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<string> m_texturePaths;
-	vector<Bone> m_BoneInfo;
 	mat4 m_GlobalInverseTransform;
 };
 
