@@ -178,72 +178,34 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 	}
 
 	// Populate the vertex attribute vectors
-// 	if (false)
-// 	{
-// 		// if the mesh has bones, read the vertices according to be bone order
-// 		vector<uint> sorted_vertexIds;
-// 		for (uint i = 0; i < mesh->mNumBones; ++i)
-// 		{
-// 			aiBone* pBone = mesh->mBones[i];
-// 			for (uint j = 0; j < pBone->mNumWeights; ++j)
-// 			{
-// 				uint vertexId = pBone->mWeights[j].mVertexId;
-// 				// avoid being added multiple times
-// 				if (std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), vertexId) == sorted_vertexIds.end())
-// 				{
-// 					fillOneVertex(vertexId, mesh, data);
-// 					sorted_vertexIds.push_back(vertexId);
-// 				}
-// 			}
-// 		}
-// 
-// 		vector<uint16> sorted_indexBuffer;
-// 		for (uint i = 0; i < data.indices.size(); ++i)
-// 		{
-// 			uint16 previousIndex = data.indices[i];
-// 			auto it = std::find(sorted_vertexIds.begin(), sorted_vertexIds.end(), previousIndex);
-// 			uint16 currentIndex = std::distance(sorted_vertexIds.begin(), it);
-// 			sorted_indexBuffer.push_back(currentIndex);
-// 		}
-// 
-// 		data.indices = sorted_indexBuffer;
-// 	}
-// 	else
+	for (uint i = 0; i < mesh->mNumVertices; ++i)
 	{
-		for (uint i = 0; i < mesh->mNumVertices; ++i)
+		data.positions.push_back(mesh->mVertices[i]);
+
+		if (mesh->HasNormals())
 		{
-			fillOneVertex(i, mesh, data);
+			data.normals.push_back(mesh->mNormals[i]);
+		}
+
+		if (mesh->HasTangentsAndBitangents())
+		{
+			data.tangents.push_back(mesh->mTangents[i]);
+			data.bitangents.push_back(mesh->mBitangents[i]);
+		}
+
+		if (mesh->HasTextureCoords(0))
+		{
+			vec3 texCoord = mesh->mTextureCoords[0][i];
+			data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
+		}
+
+		if (mesh->HasVertexColors(0))
+		{
+			color4D color = mesh->mColors[0][i];
+			data.colors.push_back(color);
 		}
 	}
 
-}
-
-void ModelLoader::fillOneVertex(unsigned int vertexIndex, const aiMesh* mesh, MeshData& data)
-{
-	data.positions.push_back(mesh->mVertices[vertexIndex]);
-
-	if (mesh->HasNormals())
-	{
-		data.normals.push_back(mesh->mNormals[vertexIndex]);
-	}
-
-	if (mesh->HasTangentsAndBitangents())
-	{
-		data.tangents.push_back(mesh->mTangents[vertexIndex]);
-		data.bitangents.push_back(mesh->mBitangents[vertexIndex]);
-	}
-
-	if (mesh->HasTextureCoords(0))
-	{
-		vec3 texCoord = mesh->mTextureCoords[0][vertexIndex];
-		data.texCoords.push_back(vec2(texCoord.x, texCoord.y));
-	}
-
-	if (mesh->HasVertexColors(0))
-	{
-		color4D color = mesh->mColors[0][vertexIndex];
-		data.colors.push_back(color);
-	}
 }
 
 void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
