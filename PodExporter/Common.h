@@ -11,6 +11,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+#include <glm/gtc/constants.hpp>
 
 typedef unsigned int uint;
 typedef aiMatrix3x3 mat3;
@@ -49,5 +51,14 @@ namespace
 			m.b1, m.b2, m.b3, m.b4,
 			m.c1, m.c2, m.c3, m.c4,
 			m.d1, m.d2, m.d3, m.d4);
+	}
+
+	glm::mat4 toGLMMatrix4x42(aiMatrix4x4& m)
+	{
+		return glm::mat4(
+			m.a1, m.b1, m.c1, m.d1,
+			m.a2, m.b2, m.c2, m.d2,
+			m.a3, m.b3, m.c3, m.d3,
+			m.a4, m.b4, m.c4, m.d4);
 	}
 }

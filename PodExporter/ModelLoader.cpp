@@ -52,7 +52,8 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	}
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation.Inverse();
-
+	glm::mat4 t = toGLMMatrix4x4(m_aiScene->mRootNode->mTransformation);
+	t = glm::inverse(t);
 	uint numVertices = 0, numIndices = 0, numFaces = 0;
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
 	{
