@@ -34,14 +34,10 @@ private:
 	void writeNodeBlock(uint index);
 	void writeTextureBlock(uint index);
 
-	aiNodeAnim* findNodeAnimation(aiAnimation* pAnimation, aiString& nodeName);
-	void calcFinalTransforms(aiAnimation* pAnimation, uint currentFrame, aiNode* pNode, glm::mat4& parentTransform);
-
 	ModelLoader m_modelLoader;
 	vector<ModelDataPtr> m_modelDataVec;
 	vector<aiNode*> m_Nodes;
-	map<aiNode*, mat4> m_matrixMap;
-	map<aiNode*, vector<glm::mat4>> m_nodeAnimationsList;
+	map<std::string, mat4> m_matrixMap;
 	bool m_exportSkinningData;
 	bool m_exportAnimations;
 	ExportOptions m_exportOptions;

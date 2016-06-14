@@ -118,7 +118,7 @@ public:
 	const aiScene* getScene() { return m_aiScene; }
 	string& getTexture(uint index) { return m_texturePaths[index]; }
 	map<string, unsigned short>& getBoneMap() { return m_BoneMapping; }
-	map<aiNode*, mat4>& getBoneOffsetMatrixMap() { return m_BoneOffsetMatrixMapping; }
+	map<string, mat4>& getBoneOffsetMatrixMap() { return m_BoneOffsetMatrixMapping; }
 	mat4 getGlobalInverseTransfromMatrix() { return m_GlobalInverseTransform; }
 private:
 	/*
@@ -147,7 +147,7 @@ private:
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
-	map<aiNode*, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
+	map<string, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<string> m_texturePaths;

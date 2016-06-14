@@ -226,7 +226,7 @@ void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
 			boneIndex = std::distance(m_Nodes.begin(), it);
 			m_BoneMapping[boneName] = boneIndex;
 
-			m_BoneOffsetMatrixMapping[boneNode] = paiMesh->mBones[i]->mOffsetMatrix;
+			m_BoneOffsetMatrixMapping[boneName] = paiMesh->mBones[i]->mOffsetMatrix;
 		}
 		else
 		{

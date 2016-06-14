@@ -670,9 +670,9 @@ void PODWriter::writeNodeBlock(uint index)
 	writeEndTag(pod::e_nodeIndex);
 
 	// Node Name
-	std::string name(node->mName.C_Str());
-	writeStartTag(pod::e_nodeName, name.length() + 1);
-	writeByteArrayFromeString(m_fileStream, name);
+	std::string nodeName(node->mName.C_Str());
+	writeStartTag(pod::e_nodeName, nodeName.length() + 1);
+	writeByteArrayFromeString(m_fileStream, nodeName);
 	writeEndTag(pod::e_nodeName);
 
 	// Material Index (if the node is a mesh)
@@ -726,11 +726,14 @@ void PODWriter::writeNodeBlock(uint index)
  		flag = 0x08; // using matrix
 		glm::mat4 boneOffset;// = toGLMMatrix4x4(m_matrixMap[node]);
 
-		if (m_matrixMap.find(node) != m_matrixMap.end())
+		if (m_matrixMap.find(nodeName) != m_matrixMap.end())
 		{
-			boneOffset = toGLMMatrix4x4(m_matrixMap[node]);
+			boneOffset = toGLMMatrix4x4(m_matrixMap[nodeName]);
 		}
-
+		//else
+		//{
+		//	boneOffset = toGLMMatrix4x4(node->mTransformation);
+		//}
 		uint numFrames = std::max(animation->mNumPositionKeys,
  			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
 		
@@ -789,45 +792,51 @@ void PODWriter::writeNodeBlock(uint index)
 				scalingM = glm::scale(glm::mat4(1.0f), scalings[scalings.size() - 1]);
 			}
 
-			glm::mat4 nodeTransformation = translationM * rotationM * scalingM;
+			// as stated in the Assimp documentation, this is absolute and not relative to the bone default pose
+			glm::mat4 nodeTransformation = translationM * rotationM * scalingM * boneOffset;
 
-			glm::mat4 parentTransform;
+			// need to get the bone space transformation matrix
+
+
+			//glm::mat4 parentTransform;
 			aiNode* pNode = node;
+			//aiNode* skeletonRoot = m_Nodes[m_modelDataVec.size()];
+			//skeletonRoot->mParent = NULL;
 			while (pNode->mParent)
 			{
-				parentTransform = toGLMMatrix4x4(pNode->mParent->mTransformation) * parentTransform;
+				//parentTransform = toGLMMatrix4x4(pNode->mParent->mTransformation) * parentTransform;
+				
+				nodeTransformation = nodeTransformation * toGLMMatrix4x4(pNode->mParent->mTransformation.Inverse());
 				pNode = pNode->mParent;
+
 			}
-			glm::mat4 inverseParent = glm::inverse(parentTransform);
+			//glm::mat4 inverseParent = glm::inverse(parentTransform);
 
-			glm::mat4 rootTrans = toGLMMatrix4x4(m_modelLoader.getScene()->mRootNode->mTransformation);
-			glm::mat4 myParentTrans = toGLMMatrix4x4(node->mParent->mTransformation);
-			glm::mat4 selfTrans = toGLMMatrix4x4(node->mTransformation);
-
+			glm::mat4 globalInverse = toGLMMatrix4x4(m_modelLoader.getScene()->mRootNode->mTransformation.Inverse());
 			glm::vec3 outScale, outTranslation, outSkew;
 			glm::quat outOrientation;
 			glm::vec4 outPerspective;
-			glm::decompose(nodeTransformation * boneOffset, outScale, outOrientation, outTranslation, outSkew, outPerspective);
-
-			glm::vec3 acurateAngles_Bip01 = glm::eulerAngles(glm::quat(-0.5, -0.5, -0.5, -0.5));
-			glm::vec3 acurateAngles_Bip01_Footsteps = glm::eulerAngles(glm::quat(0, 0, 0.707, -0.707));
-			glm::vec3 acurateAngles_Bip01_Pelvis = glm::eulerAngles(glm::quat(-0.48586, -0.48586, -0.51375, -0.51375));
-			glm::vec3 acurateAngles_Bip01_Spine = glm::eulerAngles(glm::quat(0.0001, -0.0094, -0.0222, -0.9997));
-			glm::vec3 acurateAngles_Bip01_Spine1 = glm::eulerAngles(glm::quat(-0.000266838324, -0.0184, -0.01368, -1));
-			glm::vec3 acurateAngles_Bip01_Spine2 = glm::eulerAngles(glm::quat(-0.00019, -0.012878, 0.01556, -1));
-			glm::vec3 acurateAngles_Bip01_Neck = glm::eulerAngles(glm::quat(0, 0, 0.16845, -0.9857));
+			glm::decompose(nodeTransformation, outScale, outOrientation, outTranslation, outSkew, outPerspective);
+			
+			glm::vec3 acurateAngles_Bip01 = glm::eulerAngles(glm::quat(-0.5f, -0.5f, -0.5f, -0.5f));
+			glm::vec3 acurateAngles_Bip01_Footsteps = glm::eulerAngles(glm::quat(0.f, 0.f, 0.707f, -0.707f));
+			glm::vec3 acurateAngles_Bip01_Pelvis = glm::eulerAngles(glm::quat(-0.48586f, -0.48586f, -0.51375f, -0.51375f));
+			glm::vec3 acurateAngles_Bip01_Spine = glm::eulerAngles(glm::quat(0.0001f, -0.0094f, -0.0222f, -0.9997f));
+			glm::vec3 acurateAngles_Bip01_Spine1 = glm::eulerAngles(glm::quat(-0.000266838324f, -0.0184f, -0.01368f, -1.0f));
+			glm::vec3 acurateAngles_Bip01_Spine2 = glm::eulerAngles(glm::quat(-0.00019f, -0.012878f, 0.01556f, -1.0f));
+			glm::vec3 acurateAngles_Bip01_Neck = glm::eulerAngles(glm::quat(0.f, 0.f, 0.16845f, -0.9857f));
 			//outOrientation = glm::rotate(outOrientation, glm::pi<float>() * 0.5f, glm::vec3(1, 0, 0));
 			glm::vec3 myAngles = glm::eulerAngles(outOrientation);
 			glm::vec3 myRotatedAngles1 = glm::eulerAngles(glm::rotate(outOrientation, glm::pi<float>() * 0.5f, glm::vec3(1, 0, 0)));
 			glm::vec3 myRotatedAngles2 = glm::eulerAngles(glm::rotate(outOrientation, -glm::pi<float>() * 0.5f, glm::vec3(1, 0, 0)));
-
+						
 			plainRotations.push_back(outOrientation.x);
 			plainRotations.push_back(outOrientation.y);
 			plainRotations.push_back(outOrientation.z);
 			plainRotations.push_back(outOrientation.w);
 
-			matrices.push_back(myParentTrans * nodeTransformation * boneOffset);
- 		}
+			matrices.push_back(nodeTransformation);
+		}
  	}
  	else
 	{
