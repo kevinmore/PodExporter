@@ -34,6 +34,9 @@ private:
 	void writeNodeBlock(uint index);
 	void writeTextureBlock(uint index);
 
+	mat4 calcToRoot(aiNode *node, mat4 &toRoot = mat4());
+	mat4 calcParentToRoot(aiNode *node, mat4 &toRoot = mat4());
+
 	ModelLoader m_modelLoader;
 	vector<ModelDataPtr> m_modelDataVec;
 	vector<aiNode*> m_Nodes;

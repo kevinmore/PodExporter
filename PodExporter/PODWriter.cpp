@@ -396,7 +396,7 @@ void PODWriter::writeMeshBlock(uint index)
 	writeEndTag(pod::e_meshNumFaces);
 
 	// Num. UVW channels (currently only support 1 UV channel)
-	uint32 numUVW = 1;
+	uint32 numUVW = meshData.texCoords.size() > 0 ? 1 : 0;
 	writeStartTag(pod::e_meshNumUVWChannels, 4);
 	write4Bytes(m_fileStream, numUVW);
 	writeEndTag(pod::e_meshNumUVWChannels);
@@ -456,6 +456,8 @@ void PODWriter::writeMeshBlock(uint index)
 			idOffset + 4 * sizeof(uint16), EPODDataFloat,
 			idOffset, EPODDataUnsignedShort,
 			meshData.numFaces, MAX_NUM_BONES_PER_BATCH, NUM_BONES_PER_VEREX);
+
+		// apply the bone offset matrix to each vertex
 
 		// Num. Vertices
 		writeStartTag(pod::e_meshNumVertices, 4);
@@ -734,6 +736,17 @@ void PODWriter::writeNodeBlock(uint index)
 		//{
 		//	boneOffset = toGLMMatrix4x4(node->mTransformation);
 		//}
+
+		// guess
+		aiNode* skeletonRoot = m_Nodes[m_modelDataVec.size()];
+		//skeletonRoot->mParent = NULL;
+
+		glm::mat4 nodeToRoot = toGLMMatrix4x4(calcToRoot(node));
+		glm::mat4 nodeToRootInverse = glm::inverse(nodeToRoot);
+
+
+		//boneOffset =  nodeToRootInverse * boneOffset;
+
 		uint numFrames = std::max(animation->mNumPositionKeys,
  			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
 		
@@ -747,6 +760,11 @@ void PODWriter::writeNodeBlock(uint index)
  		{
 			rotations.push_back(glm::quat(animation->mRotationKeys[i].mValue.w, animation->mRotationKeys[i].mValue.x,
 				animation->mRotationKeys[i].mValue.y, animation->mRotationKeys[i].mValue.z));
+
+			plainRotations.push_back(animation->mRotationKeys[i].mValue.x);
+			plainRotations.push_back(animation->mRotationKeys[i].mValue.y);
+			plainRotations.push_back(animation->mRotationKeys[i].mValue.z);
+			plainRotations.push_back(animation->mRotationKeys[i].mValue.w);
  		}
  
  		for (uint i = 0; i < animation->mNumScalingKeys; ++i)
@@ -793,26 +811,26 @@ void PODWriter::writeNodeBlock(uint index)
 			}
 
 			// as stated in the Assimp documentation, this is absolute and not relative to the bone default pose
-			glm::mat4 nodeTransformation = translationM * rotationM * scalingM * boneOffset;
+			glm::mat4 nodeTransformation = translationM * rotationM * scalingM;
 
 			// need to get the bone space transformation matrix
 
-
-			//glm::mat4 parentTransform;
+			glm::mat4 parentTransform;
 			aiNode* pNode = node;
 			//aiNode* skeletonRoot = m_Nodes[m_modelDataVec.size()];
 			//skeletonRoot->mParent = NULL;
 			while (pNode->mParent)
 			{
-				//parentTransform = toGLMMatrix4x4(pNode->mParent->mTransformation) * parentTransform;
-				
-				nodeTransformation = nodeTransformation * toGLMMatrix4x4(pNode->mParent->mTransformation.Inverse());
+				parentTransform = toGLMMatrix4x4(pNode->mParent->mTransformation) * parentTransform;
+
+				//nodeTransformation = nodeTransformation * toGLMMatrix4x4(pNode->mParent->mTransformation.Inverse());
 				pNode = pNode->mParent;
 
 			}
 			//glm::mat4 inverseParent = glm::inverse(parentTransform);
 
 			glm::mat4 globalInverse = toGLMMatrix4x4(m_modelLoader.getScene()->mRootNode->mTransformation.Inverse());
+			glm::mat4 parentTransform2 = toGLMMatrix4x4(calcParentToRoot(node));
 			glm::vec3 outScale, outTranslation, outSkew;
 			glm::quat outOrientation;
 			glm::vec4 outPerspective;
@@ -829,13 +847,14 @@ void PODWriter::writeNodeBlock(uint index)
 			glm::vec3 myAngles = glm::eulerAngles(outOrientation);
 			glm::vec3 myRotatedAngles1 = glm::eulerAngles(glm::rotate(outOrientation, glm::pi<float>() * 0.5f, glm::vec3(1, 0, 0)));
 			glm::vec3 myRotatedAngles2 = glm::eulerAngles(glm::rotate(outOrientation, -glm::pi<float>() * 0.5f, glm::vec3(1, 0, 0)));
-						
-			plainRotations.push_back(outOrientation.x);
-			plainRotations.push_back(outOrientation.y);
-			plainRotations.push_back(outOrientation.z);
-			plainRotations.push_back(outOrientation.w);
+			
+			
+			//plainRotations.push_back(outOrientation.x);
+			//plainRotations.push_back(outOrientation.y);
+			//plainRotations.push_back(outOrientation.z);
+			//plainRotations.push_back(outOrientation.w);
 
-			matrices.push_back(nodeTransformation);
+			matrices.push_back(parentTransform2 * nodeTransformation * boneOffset);
 		}
  	}
  	else
@@ -1090,6 +1109,28 @@ void PODWriter::writeTextureBlock(uint index)
 	writeEndTag(pod::e_textureFilename);
 
 	writeEndTag(pod::e_sceneTexture);
+}
+
+mat4 PODWriter::calcToRoot(aiNode *node, mat4 &toRoot /*= mat4()*/)
+{
+	toRoot = node->mTransformation * toRoot;
+
+	if (node->mParent == NULL)
+		return toRoot;
+	else
+		return calcToRoot(node->mParent, toRoot);
+}
+
+mat4 PODWriter::calcParentToRoot(aiNode *node, mat4 &toRoot /*= mat4()*/)
+{
+
+	if (node->mParent == NULL)
+		return toRoot;
+	else
+	{
+		toRoot = node->mParent->mTransformation * toRoot;
+		return calcToRoot(node->mParent, toRoot);
+	}
 }
 
 /*

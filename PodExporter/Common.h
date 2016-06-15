@@ -54,12 +54,38 @@ namespace
 			m.d1, m.d2, m.d3, m.d4);
 	}
 
-	glm::mat4 toGLMMatrix4x42(aiMatrix4x4& m)
+	//display a given matrix
+	void displayMat4(const aiMatrix4x4 &m, bool transpose = false)
 	{
-		return glm::mat4(
-			m.a1, m.b1, m.c1, m.d1,
-			m.a2, m.b2, m.c2, m.d2,
-			m.a3, m.b3, m.c3, m.d3,
-			m.a4, m.b4, m.c4, m.d4);
+		using namespace std;
+
+		aiMatrix4x4 mat = m;
+		if (transpose)
+			mat.Transpose();
+
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = 0; j < 4; j++)
+				cout << mat[i][j] << " ";
+			cout << "\n";
+		}
+		cout << "\n--------------------------\n\n";
+	}
+
+	void displayMat4(const glm::mat4 &m, bool transpose = false)
+	{
+		using namespace std;
+
+		glm::mat4 mat = m;
+		if (transpose)
+			mat = glm::transpose(mat);
+
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = 0; j < 4; j++)
+				cout << mat[i][j] << " ";
+			cout << "\n";
+		}
+		cout << "\n--------------------------\n\n";
 	}
 }
