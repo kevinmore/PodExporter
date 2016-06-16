@@ -119,7 +119,6 @@ public:
 	string& getTexture(uint index) { return m_texturePaths[index]; }
 	map<string, unsigned short>& getBoneMap() { return m_BoneMapping; }
 	map<string, mat4>& getBoneOffsetMatrixMap() { return m_BoneOffsetMatrixMapping; }
-	mat4 getGlobalInverseTransfromMatrix() { return m_GlobalInverseTransform; }
 private:
 	/*
 	*	Methods to process the model file
@@ -133,7 +132,9 @@ private:
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);
 	mat4 calculateGlobalTransform(aiNode* pNode);
-
+	void getFrameBoneTransforms(uint frameIndex);
+	void calcFrameFinalTransforms(uint frameIndex, aiNode* pNode, mat4 &parentTransform);
+	aiNodeAnim* findNodeAnim(aiAnimation* pAnimation, aiString nodeName);
 	/*
 	*	Clean up
 	*/
@@ -146,11 +147,12 @@ private:
 	// make the importer as member valuable, so that it does not call FreeScene until the class is destructed
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
+	mat4 m_GlobalInverseTransform;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
 	map<string, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
+	map<string, mat4> m_BoneFinalMatrixMapping; // maps a bone name to its final matrix
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<string> m_texturePaths;
-	mat4 m_GlobalInverseTransform;
 };
 
