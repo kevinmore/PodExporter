@@ -88,14 +88,16 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		}
 
 		// TODO: NEED MORE TESTS
-		md->meshData.unpackMatrix = calculateGlobalTransform(meshNode);
-		//md->meshData.unpackMatrix = meshNode->mTransformation;
+		//md->meshData.unpackMatrix = calculateGlobalTransform(meshNode);
+		md->meshData.unpackMatrix = meshNode->mTransformation;
 
 		m_Nodes.push_back(meshNode);
 	}
 
 	// parse other nodes, this step makes sure the mesh nodes are in the front
 	parseNoneMeshNodes(m_aiScene->mRootNode);
+
+	//displaySceneGraph(m_aiScene->mRootNode);
 
 	// load bones
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
@@ -180,7 +182,7 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 				meshNode->mNumMeshes = 1;
 				meshNode->mParent = pNode;
 				meshNode->mMeshes = new unsigned int[1]{ meshIndex };
-
+				meshNode->mTransformation = pNode->mTransformation;
 				// register this new node
 				//++parent->mNumChildren;
 				//parent->mChildren[parent->mNumChildren - 1] = meshNode;
@@ -436,7 +438,7 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	return data;
 }
 
-void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
+void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 {
 	if (!pNode) return;
 
@@ -445,27 +447,24 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode)
 	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
 
 	// if the node is an assimp generated intermediate nodes
-	std::string name = std::string(pNode ->mName.C_Str());
-	bool isIntermediate = name.find("_$AssimpFbx$") != std::string::npos;
-
-	if (isIntermediate)
-	{
-		// assign the parent ship
-		for (size_t i = 0; i < pNode->mNumChildren; ++i)
-		{
-			pNode->mChildren[i]->mParent = pNode->mParent;
-		}
-	}
+//  	if (isIntermediateNode(pNode))
+//  	{
+// 		aiNode* cleanNode = applyChildTransform(pNode);
+// 
+// 		// remove the intermediate nodes
+// 		cleanNode->mParent = pNode->mParent;
+// 		pNode->mParent->mChildren[index] = cleanNode;
+//  	}
 
 	// ignore the node with 0 or multiple meshes, the root node
-	if (!isUselessNode && !isIntermediate && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
+	if (!isUselessNode /*&& !isIntermediateNode(pNode)*/ && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
 	{
 		m_Nodes.push_back(pNode);
 	}
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
-		parseNoneMeshNodes(pNode->mChildren[i]);
+		parseNoneMeshNodes(pNode->mChildren[i], i);
 	}
 }
 
@@ -492,4 +491,40 @@ mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)
 	}
 
 	return result;
+}
+
+aiNode* ModelLoader::applyChildTransform(aiNode* pNode, mat4& parentTransform)
+{
+	pNode->mTransformation = parentTransform * pNode->mTransformation;
+	aiNode* result = NULL;
+
+	if (isIntermediateNode(pNode))
+	{
+		for (uint i = 0; i < pNode->mNumChildren; ++i)
+		{
+			result = applyChildTransform(pNode->mChildren[i], pNode->mTransformation);
+		}
+	}
+	else
+	{
+		result = pNode;
+	}
+	return result;
+}
+
+void ModelLoader::displaySceneGraph(aiNode* pNode, uint indent /*= 0*/)
+{
+	for (uint i = 0; i < indent; ++i)
+		cout << " ";
+
+	cout << pNode->mName.C_Str() << endl;
+
+	for (uint i = 0; i < pNode->mNumChildren; ++i)
+		displaySceneGraph(pNode->mChildren[i], indent + 1);
+}
+
+bool ModelLoader::isIntermediateNode(aiNode* pNode)
+{
+	std::string name = std::string(pNode->mName.C_Str());
+	return name.find("_$AssimpFbx$") != std::string::npos;
 }

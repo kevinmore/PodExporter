@@ -130,8 +130,14 @@ private:
 	void readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
-	void parseNoneMeshNodes(aiNode* pNode);
+	void parseNoneMeshNodes(aiNode* pNode, uint index = 0);
 	mat4 calculateGlobalTransform(aiNode* pNode);
+
+	bool isIntermediateNode(aiNode* pNode);
+	aiNode* applyChildTransform(aiNode* pNode, mat4& parentTransform = mat4());
+
+	void displaySceneGraph(aiNode* pNode, uint indent = 0);
+
 	/*
 	*	Clean up
 	*/
