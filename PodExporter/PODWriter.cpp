@@ -716,45 +716,49 @@ void PODWriter::writeNodeBlock(uint index)
 			break;
 		}
 	}
-	vector<float> positions, rotations;
-	vector<vec3> scalings;
-	uint32 flag = 0x00; // no animation
+
+	uint32 flag;
+	vector<mat4> nodeTransformations;
+
 	if (animation)
 	{
-		flag = 0x07; // not using matrix
+		flag = 0x08; // using matrix
 
-		for (uint i = 0; i < animation->mNumPositionKeys; ++i)
-		{
-			positions.push_back(animation->mPositionKeys[i].mValue.x);
-			positions.push_back(animation->mPositionKeys[i].mValue.y);
-			positions.push_back(animation->mPositionKeys[i].mValue.z);
-		}
+		uint numFrames = std::max(animation->mNumPositionKeys,
+			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
 
-		for (uint i = 0; i < animation->mNumRotationKeys; ++i)
+		for (uint i = 0; i < numFrames; ++i)
 		{
-			rotations.push_back(animation->mRotationKeys[i].mValue.x);
-			rotations.push_back(animation->mRotationKeys[i].mValue.y);
-			rotations.push_back(animation->mRotationKeys[i].mValue.z);
-			rotations.push_back(animation->mRotationKeys[i].mValue.w);
-		}
+			vec3 pos, scaling;
+			quat rot;
 
-		for (uint i = 0; i < animation->mNumScalingKeys; ++i)
-		{
-			scalings.push_back(animation->mScalingKeys[i].mValue);
+			if (i < animation->mNumPositionKeys)
+				pos = animation->mPositionKeys[i].mValue;
+			else
+				// pick the last one
+				pos = animation->mPositionKeys[animation->mNumPositionKeys - 1].mValue;
+
+			if (i < animation->mNumRotationKeys)
+				rot = animation->mRotationKeys[i].mValue;
+			else
+				// pick the last one
+				rot = animation->mRotationKeys[animation->mNumRotationKeys - 1].mValue;
+
+			if (i < animation->mNumScalingKeys)
+				scaling = animation->mScalingKeys[i].mValue;
+			else
+				// pick the last one
+				scaling = animation->mScalingKeys[animation->mNumScalingKeys - 1].mValue;
+
+			// this matrix need to be transposed to match the pod file matrix layout
+			nodeTransformations.push_back(mat4(scaling, rot, pos).Transpose());
 		}
 	}
 	else
 	{
-		positions.push_back(0.0f);
-		positions.push_back(0.0f);
-		positions.push_back(0.0f);
-
-		rotations.push_back(0.0f);
-		rotations.push_back(0.0f);
-		rotations.push_back(0.0f);
-		rotations.push_back(1.0f);
-
-		scalings.push_back(vec3(1.0f));
+		// no animation
+		flag = 0x00;
+		nodeTransformations.push_back(mat4());
 	}
 
 	// Animation Flag
@@ -762,32 +766,13 @@ void PODWriter::writeNodeBlock(uint index)
 	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);
 
-	// Animation Position, 3 floats per frame of animation
-	writeStartTag(pod::e_nodeAnimationPosition, 4 * positions.size());
-	write4ByteArrayFromVector(m_fileStream, positions);
-	writeEndTag(pod::e_nodeAnimationPosition);
-
-	// Animation Rotation, 4 floats per frame of animation
-	writeStartTag(pod::e_nodeAnimationRotation, 4 * rotations.size());
-	write4ByteArrayFromVector(m_fileStream, rotations);
-	writeEndTag(pod::e_nodeAnimationRotation);
-
-	// Animation Scale, 7 floats per frame of animation
-	writeStartTag(pod::e_nodeAnimationScale, 4 * 7 * scalings.size());
-	float32 zeroPadding = 0.0f;
-	for (uint i = 0; i < scalings.size(); ++i)
+	// Animation Matrix, 16 floats per frame of animation
+	writeStartTag(pod::e_nodeAnimationMatrix, sizeof(nodeTransformations[0]) * nodeTransformations.size());
+	for (uint i = 0; i < nodeTransformations.size(); ++i)
 	{
-		write4Bytes(m_fileStream, scalings[i].x);
-		write4Bytes(m_fileStream, scalings[i].y);
-		write4Bytes(m_fileStream, scalings[i].z);
-
-		// write four paddings of 0, due to the legacy pod file usage
-		write4Bytes(m_fileStream, zeroPadding);
-		write4Bytes(m_fileStream, zeroPadding);
-		write4Bytes(m_fileStream, zeroPadding);
-		write4Bytes(m_fileStream, zeroPadding);
+		write4ByteArray(m_fileStream, &nodeTransformations[i][0][0], 16);
 	}
-	writeEndTag(pod::e_nodeAnimationScale);
+	writeEndTag(pod::e_nodeAnimationMatrix);
 
 	writeEndTag(pod::e_sceneNode);
 }

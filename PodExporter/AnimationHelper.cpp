@@ -41,19 +41,19 @@ void AnimationHelper::calcFinalTransformsAtFrame(uint frameIndex, aiAnimation* p
 		m_BoneFinalMatrixMapping[nodeName] = m_globalInverseMatrix * globalTransform * m_BoneOffsetMatrixMapping[nodeName];
 	}
 
-	bool printout = false;
-	if (printout)
-	{
-		vec3 scaling, pos;
-		quat rot;
-		globalTransform.Decompose(scaling, rot, pos);
-		cout << "-------------------------" << endl;
-		cout << nodeName << endl;
-		cout << "Translation: " << pos.x << ", " << pos.y << ", " << pos.z << endl;
-		cout << "Scaling: " << scaling.x << ", " << scaling.y << ", " << scaling.z << endl;
-		cout << "Rotation: " << rot.x << ", " << rot.y << ", " << rot.z << ", " << rot.w << endl;
-		cout << "-------------------------" << endl;
-	}
+// 	bool printout = false;
+// 	if (printout)
+// 	{
+// 		vec3 scaling, pos;
+// 		quat rot;
+// 		globalTransform.Decompose(scaling, rot, pos);
+// 		cout << "-------------------------" << endl;
+// 		cout << nodeName << endl;
+// 		cout << "Translation: " << pos.x << ", " << pos.y << ", " << pos.z << endl;
+// 		cout << "Scaling: " << scaling.x << ", " << scaling.y << ", " << scaling.z << endl;
+// 		cout << "Rotation: " << rot.x << ", " << rot.y << ", " << rot.z << ", " << rot.w << endl;
+// 		cout << "-------------------------" << endl;
+// 	}
 
 	for (uint i = 0; i < pNode->mNumChildren; ++i)
 	{

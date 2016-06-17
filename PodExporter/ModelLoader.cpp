@@ -107,32 +107,13 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		}
 	}
 	
-	// apply the first frame pose
-	//if (false)
+	// IMPORTANT: this step is essential, make sure the model is not in bind pose, otherwise the animation will be broken
 	if (m_aiScene->HasAnimations())
 	{
 		AnimationHelper helper(m_GlobalInverseTransform, m_BoneOffsetMatrixMapping);
+
+		// apply the first frame pose (frame index = 0)
 		map<string, mat4> boneFinalTransforms = helper.getBoneFinalTransformsAtFrame(0, m_aiScene->mAnimations[0], m_aiScene->mRootNode);
-
-
-		bool printout = false;
-		if (printout)
-		{
-			for (auto i = modelDataVector.size(); i < m_Nodes.size(); ++i)
-			{
-				cout << endl << i << " - " << m_Nodes[i]->mName.C_Str() << endl;
-				DisplayMat4(boneFinalTransforms[string(m_Nodes[i]->mName.C_Str())]);
-
-				vec3 scaling, pos;
-				quat rot;
-				boneFinalTransforms[string(m_Nodes[i]->mName.C_Str())].Decompose(scaling, rot, pos);
-				cout << "-------------------------" << endl;
-				cout << "Translation: " << pos.x << ", " << pos.y << ", " << pos.z << endl;
-				cout << "Scaling: " << scaling.x << ", " << scaling.y << ", " << scaling.z << endl;
-				cout << "Rotation: " << rot.x << ", " << rot.y << ", " << rot.z << ", " << rot.w << endl;
-				cout << "-------------------------" << endl;
-			}
-		}
 
 		for (uint i = 0; i < modelDataVector.size(); ++i)
 		{
