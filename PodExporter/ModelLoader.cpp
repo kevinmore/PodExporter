@@ -1,4 +1,5 @@
 #include "ModelLoader.h"
+#include "AnimationHelper.h"
 #include <sstream>
 #include <assimp/postprocess.h>
 
@@ -110,42 +111,63 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	//if (false)
 	if (m_aiScene->HasAnimations())
 	{
-		getFrameBoneTransforms(0);
+		AnimationHelper helper(m_GlobalInverseTransform, m_BoneOffsetMatrixMapping);
+		map<string, mat4> boneFinalTransforms = helper.getBoneFinalTransformsAtFrame(0, m_aiScene->mAnimations[0], m_aiScene->mRootNode);
 
-		for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
+
+		bool printout = false;
+		if (printout)
+		{
+			for (auto i = modelDataVector.size(); i < m_Nodes.size(); ++i)
+			{
+				cout << endl << i << " - " << m_Nodes[i]->mName.C_Str() << endl;
+				DisplayMat4(boneFinalTransforms[string(m_Nodes[i]->mName.C_Str())]);
+
+				vec3 scaling, pos;
+				quat rot;
+				boneFinalTransforms[string(m_Nodes[i]->mName.C_Str())].Decompose(scaling, rot, pos);
+				cout << "-------------------------" << endl;
+				cout << "Translation: " << pos.x << ", " << pos.y << ", " << pos.z << endl;
+				cout << "Scaling: " << scaling.x << ", " << scaling.y << ", " << scaling.z << endl;
+				cout << "Rotation: " << rot.x << ", " << rot.y << ", " << rot.z << ", " << rot.w << endl;
+				cout << "-------------------------" << endl;
+			}
+		}
+
+		for (uint i = 0; i < modelDataVector.size(); ++i)
 		{
 			for (uint j = 0; j < modelDataVector[i]->meshData.numVertices; ++j)
 			{
 				VertexBoneData boneData = modelDataVector[i]->meshData.bones[j];
 
-				glm::mat4 finalBoneTransformation(0.0f);
+				glm::mat4 finalM(0.0f);
 				for (uint k = 0; k < 4; ++k)
 				{
 					float weight = boneData.Weights[k];
 
 					if (weight == 0.0f)
-					{
 						continue;
-					}
 
 					std::string boneName(m_Nodes[boneData.IDs[k]]->mName.C_Str());
-					glm::mat4 weightedOffsetMat = toGLMMatrix4x4(m_BoneFinalMatrixMapping[boneName]) * weight;
-					finalBoneTransformation += weightedOffsetMat;
+					glm::mat4 weightedMat = weight * toGLMMatrix4x4(boneFinalTransforms[boneName]);
+
+					finalM += weightedMat;
 				}
+
 				vec3 oldPos = modelDataVector[i]->meshData.positions[j];
-				glm::vec4 newPos = finalBoneTransformation * glm::vec4(oldPos.x, oldPos.y, oldPos.z, 1.0f);
+				glm::vec4 newPos = glm::vec4(oldPos.x, oldPos.y, oldPos.z, 1.0f) * finalM; // THE ORDER MATTERS!
 				modelDataVector[i]->meshData.positions[j] = vec3(newPos.x, newPos.y, newPos.z);
-
+				
 				vec3 oldNormal = modelDataVector[i]->meshData.normals[j];
-				glm::vec4 newNormal = finalBoneTransformation * glm::vec4(oldNormal.x, oldNormal.y, oldNormal.z, 1.0f);
+				glm::vec4 newNormal = glm::vec4(oldNormal.x, oldNormal.y, oldNormal.z, 0.0f) * finalM;
 				modelDataVector[i]->meshData.normals[j] = vec3(newNormal.x, newNormal.y, newNormal.z);
-
+				
 				vec3 oldTagent = modelDataVector[i]->meshData.tangents[j];
-				glm::vec4 newTagent = finalBoneTransformation * glm::vec4(oldTagent.x, oldTagent.y, oldTagent.z, 1.0f);
+				glm::vec4 newTagent = glm::vec4(oldTagent.x, oldTagent.y, oldTagent.z, 0.0f) * finalM;
 				modelDataVector[i]->meshData.tangents[j] = vec3(newTagent.x, newTagent.y, newTagent.z);
-
+				
 				vec3 oldBiTagent = modelDataVector[i]->meshData.bitangents[j];
-				glm::vec4 newBiTagent = finalBoneTransformation * glm::vec4(oldBiTagent.x, oldBiTagent.y, oldBiTagent.z, 1.0f);
+				glm::vec4 newBiTagent = glm::vec4(oldBiTagent.x, oldBiTagent.y, oldBiTagent.z, 0.0f) * finalM;
 				modelDataVector[i]->meshData.bitangents[j] = vec3(newBiTagent.x, newBiTagent.y, newBiTagent.z);
 			}
 		}
@@ -489,70 +511,4 @@ mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)
 	}
 
 	return result;
-}
-
-void ModelLoader::getFrameBoneTransforms(uint frameIndex)
-{
-	//calcFirstFrameFinalTransforms(m_Nodes[m_aiScene->mNumMeshes], mat4());
-	calcFrameFinalTransforms(frameIndex, m_aiScene->mRootNode, mat4());
-}
-
-void ModelLoader::calcFrameFinalTransforms(uint frameIndex, aiNode* pNode, mat4 &parentTransform)
-{
-	aiAnimation* pAnimation = m_aiScene->mAnimations[0];
-
-	mat4 nodeTransform = pNode->mTransformation;
-
-	aiNodeAnim* pNodeAnim = findNodeAnim(pAnimation, pNode->mName);
-
-	if (pNodeAnim)
-	{
-		aiVectorKey pos = frameIndex < pNodeAnim->mNumPositionKeys ? pNodeAnim->mPositionKeys[frameIndex] 
-			: pNodeAnim->mPositionKeys[pNodeAnim->mNumPositionKeys - 1];
-
-		aiQuatKey rot = frameIndex < pNodeAnim->mNumRotationKeys ? pNodeAnim->mRotationKeys[frameIndex]
-			: pNodeAnim->mRotationKeys[pNodeAnim->mNumRotationKeys - 1];
-
-		aiVectorKey scaling = frameIndex < pNodeAnim->mNumScalingKeys ? pNodeAnim->mScalingKeys[frameIndex]
-			: pNodeAnim->mScalingKeys[pNodeAnim->mNumScalingKeys - 1];
-
-		nodeTransform = mat4(scaling.mValue, rot.mValue, pos.mValue);
-	}
-
-	mat4 globalTransform = parentTransform * nodeTransform;
-	std::string nodeName(pNode->mName.C_Str());
-	if (m_BoneOffsetMatrixMapping.find(nodeName) != m_BoneOffsetMatrixMapping.end())
-	{
-		m_BoneFinalMatrixMapping[nodeName] = globalTransform * m_BoneOffsetMatrixMapping[nodeName];
-	}
-
-//  	vec3 scaling, pos;
-//  	quat rot;
-//  	globalTransform.Decompose(scaling, rot, pos);
-//  	cout << "-------------------------" << endl;
-//  	cout << nodeName << endl;
-//  	cout << "Translation: " << pos.x << ", " << pos.y << ", " << pos.z << endl;
-//  	cout << "Scaling: " << scaling.x << ", " << scaling.y << ", " << scaling.z << endl;
-//  	cout << "Rotation: " << rot.x << ", " << rot.y << ", " << rot.z << ", " << rot.w << endl;
-//  	cout << "-------------------------" << endl;
-
-	for (uint i = 0; i < pNode->mNumChildren; ++i)
-	{
-		calcFrameFinalTransforms(frameIndex, pNode->mChildren[i], globalTransform);
-	}
-}
-
-aiNodeAnim* ModelLoader::findNodeAnim(aiAnimation* pAnimation, aiString nodeName)
-{
-	for (uint i = 0; i < pAnimation->mNumChannels; ++i) 
-	{
-		aiNodeAnim* pNodeAnim = pAnimation->mChannels[i];
-
-		if (pNodeAnim->mNodeName == nodeName) 
-		{
-			return pNodeAnim;
-		}
-	}
-
-	return NULL;
 }

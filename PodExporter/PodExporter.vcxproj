@@ -121,6 +121,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AnimationHelper.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="PODWriter.cpp" />
@@ -128,6 +129,7 @@
     <ClCompile Include="PVRTVertex.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AnimationHelper.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="ModelConverter.h" />
     <ClInclude Include="ModelLoader.h" />

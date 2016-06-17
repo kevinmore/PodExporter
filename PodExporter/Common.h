@@ -63,37 +63,61 @@ namespace
 	}
 
 	//display a given matrix
-	void displayMat4(const aiMatrix4x4 &m, bool transpose = false)
+	void DisplayMat4(aiMatrix4x4& m, bool transpose = false)
 	{
-		using namespace std;
-
+		printf("--------------------------\n");
 		aiMatrix4x4 mat = m;
 		if (transpose)
 			mat.Transpose();
 
-		for (int i = 0; i < 4; i++)
-		{
-			for (int j = 0; j < 4; j++)
-				cout << mat[i][j] << " ";
-			cout << "\n";
+		for (int i = 0; i < 4; i++) {
+			printf("%f %f %f %f\n", mat[i][0], mat[i][1], mat[i][2], mat[i][3]);
 		}
-		cout << "\n--------------------------\n\n";
+
+		printf("--------------------------\n");
 	}
 
-	void displayMat4(const glm::mat4 &m, bool transpose = false)
+	void DisplayMat4(glm::mat4& m, bool transpose = false)
 	{
-		using namespace std;
+		DisplayMat4(toAssimpMatrix4x4(m), transpose);
+	}
 
-		glm::mat4 mat = m;
-		if (transpose)
-			mat = glm::transpose(mat);
-
-		for (int i = 0; i < 4; i++)
+	mat4 MultiplyMatrix(aiMatrix4x4& m, float k)
+	{
+		mat4 ret;
+		for (uint i = 0; i < 4; ++i)
 		{
-			for (int j = 0; j < 4; j++)
-				cout << mat[i][j] << " ";
-			cout << "\n";
+			for (uint j = 0; j < 4; ++j)
+			{
+				ret[i][j] = k * m[i][j];
+			}
 		}
-		cout << "\n--------------------------\n\n";
+
+		return ret;
+	}
+
+	void SetMatrixZero(aiMatrix4x4& inOutMatrix)
+	{
+		for (uint i = 0; i < 4; ++i)
+		{
+			for (uint j = 0; j < 4; ++j)
+			{
+				inOutMatrix[i][j] = 0.0f;
+			}
+		}
+	}
+
+	mat4 AddTowMatrices(aiMatrix4x4& m1, aiMatrix4x4& m2)
+	{
+		mat4 ret;
+		for (uint i = 0; i < 4; ++i)
+		{
+			for (uint j = 0; j < 4; ++j)
+			{
+				ret[i][j] = m1[i][j] + m2[i][j];
+			}
+		}
+
+		return ret;
 	}
 }

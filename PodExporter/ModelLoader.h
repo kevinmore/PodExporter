@@ -132,9 +132,6 @@ private:
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode);
 	mat4 calculateGlobalTransform(aiNode* pNode);
-	void getFrameBoneTransforms(uint frameIndex);
-	void calcFrameFinalTransforms(uint frameIndex, aiNode* pNode, mat4 &parentTransform);
-	aiNodeAnim* findNodeAnim(aiAnimation* pAnimation, aiString nodeName);
 	/*
 	*	Clean up
 	*/
@@ -150,7 +147,6 @@ private:
 	mat4 m_GlobalInverseTransform;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
 	map<string, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
-	map<string, mat4> m_BoneFinalMatrixMapping; // maps a bone name to its final matrix
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<string> m_texturePaths;
