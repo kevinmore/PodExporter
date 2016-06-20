@@ -119,6 +119,11 @@ public:
 	string& getTexture(uint index) { return m_texturePaths[index]; }
 	map<string, unsigned short>& getBoneMap() { return m_BoneMapping; }
 	map<string, mat4>& getBoneOffsetMatrixMap() { return m_BoneOffsetMatrixMapping; }
+	map<string, aiNodeAnim*> getExtraNodeAnimationMap() { return m_extraNodeAnimation; }
+	bool isExtraNode(aiNode* pNode);
+	bool isExtraNode(string& nodeName);
+	aiNode* getTrueParentNode(aiNode* pNode);
+
 private:
 	/*
 	*	Methods to process the model file
@@ -131,12 +136,14 @@ private:
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseNoneMeshNodes(aiNode* pNode, uint index = 0);
+	void parseExtraNodes(aiNode* pNode);
 	mat4 calculateGlobalTransform(aiNode* pNode);
 
-	bool isIntermediateNode(aiNode* pNode);
 	aiNode* applyChildTransform(aiNode* pNode, mat4& parentTransform = mat4());
 
 	void displaySceneGraph(aiNode* pNode, uint indent = 0);
+
+	void collectExtraNodeAnimations();
 
 	/*
 	*	Clean up
@@ -153,8 +160,10 @@ private:
 	mat4 m_GlobalInverseTransform;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
 	map<string, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
+	map<string, aiNodeAnim*> m_extraNodeAnimation; // maps an extra node to its animation
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
 	vector<string> m_texturePaths;
+	vector<aiNode*> m_parsedExtraNodes;
 };
 

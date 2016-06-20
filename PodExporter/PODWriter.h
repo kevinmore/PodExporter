@@ -40,7 +40,7 @@ private:
 	bool m_exportSkinningData;
 	bool m_exportAnimations;
 	ExportOptions m_exportOptions;
-
+	uint32 m_numFrames;
 	fstream m_fileStream;
 };
 

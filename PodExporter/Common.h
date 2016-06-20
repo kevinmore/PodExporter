@@ -82,6 +82,19 @@ namespace
 		DisplayMat4(toAssimpMatrix4x4(m), transpose);
 	}
 
+	void DecomposeAndDisplayMat4(aiMatrix4x4& m)
+	{
+		using namespace std;
+		vec3 scaling, pos;
+		quat rot;
+		m.Decompose(scaling, rot, pos);
+		cout << "-------------------------" << endl;
+		cout << "Translation: " << pos.x << ", " << pos.y << ", " << pos.z << endl;
+		cout << "Scaling: " << scaling.x << ", " << scaling.y << ", " << scaling.z << endl;
+		cout << "Rotation: " << rot.x << ", " << rot.y << ", " << rot.z << ", " << rot.w << endl;
+		cout << "-------------------------" << endl;
+	}
+
 	mat4 MultiplyMatrix(aiMatrix4x4& m, float k)
 	{
 		mat4 ret;

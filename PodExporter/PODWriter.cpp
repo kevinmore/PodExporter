@@ -308,7 +308,6 @@ void PODWriter::writeSceneBlock()
 	write4Bytes(m_fileStream, numMaterials);
 	writeEndTag(pod::e_sceneNumMaterials);
 
-	uint32 numFrames = 0;
 	if (m_exportAnimations)
 	{
 		aiAnimation* animation = m_modelLoader.getScene()->mAnimations[0];
@@ -321,13 +320,13 @@ void PODWriter::writeSceneBlock()
 		}
 
 		// Num. Frames
-		numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
+		m_numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
 		writeStartTag(pod::e_sceneNumFrames, 4);
-		write4Bytes(m_fileStream, numFrames);
+		write4Bytes(m_fileStream, m_numFrames);
 		writeEndTag(pod::e_sceneNumFrames);
 
 		// FPS (30 fps by default)
-		uint32 fps = numFrames / static_cast<uint32>(animation->mDuration);
+		uint32 fps = m_numFrames / static_cast<uint32>(animation->mDuration);
 
 		//special case
 		if (fps == 0)
@@ -653,6 +652,11 @@ void PODWriter::writeMeshBlock(uint index)
 void PODWriter::writeNodeBlock(uint index)
 {
 	aiNode* node = m_Nodes[index];
+// 	bool isChildOfExtraNode = false;
+// 	if (node->mParent)
+// 	{
+// 		m_modelLoader.isExtraNode(node->mParent);
+// 	}
 	cout << "\n" << index << " " << node->mName.C_Str();
 
 	// write node block
@@ -686,6 +690,18 @@ void PODWriter::writeNodeBlock(uint index)
 			break;
 		}
 	}
+//  	if (parentIdx == -1 && isChildOfExtraNode)
+//  	{
+//  		aiNode* trueParent = m_modelLoader.getTrueParentNode(node);
+//  		for (uint32 i = 0; i < m_Nodes.size(); ++i)
+//  		{
+//  			if (m_Nodes[i] == trueParent)
+//  			{
+//  				parentIdx = i;
+//  				break;
+//  			}
+//  		}
+//  	}
 	writeStartTag(pod::e_nodeParentIndex, 4);
 	write4Bytes(m_fileStream, parentIdx);
 	writeEndTag(pod::e_nodeParentIndex);
@@ -709,57 +725,114 @@ void PODWriter::writeNodeBlock(uint index)
 		}
 	}
 
-	uint32 flag = 0;
+	uint32 flag;
+	vector<mat4> nodeTransformations, extraNodeTransformations;
+
+// 	if (isChildOfExtraNode)
+// 	{
+// 		map<string, aiNodeAnim*> extraAnimationsMap = m_modelLoader.getExtraNodeAnimationMap();
+// 
+// 		// find extra animations
+// 		vector<aiNode*> parentNodes;
+// 		aiNode* temp = node->mParent;
+// 		while (m_modelLoader.isExtraNode(temp))
+// 		{
+// 			parentNodes.push_back(temp);
+// 			temp = temp->mParent;
+// 		}
+// 
+// 		for (uint i = 0; i < parentNodes.size(); ++i)
+// 		{
+// 			string tempNodeName = string(parentNodes[i]->mName.C_Str());
+// 			if (extraAnimationsMap.find(tempNodeName) != extraAnimationsMap.end())
+// 			{
+// 				aiNodeAnim* extraAnim = extraAnimationsMap[tempNodeName];
+// 
+// 				uint numFrames = std::max(extraAnim->mNumPositionKeys,
+// 					std::max(extraAnim->mNumRotationKeys, extraAnim->mNumScalingKeys));
+// 
+// 				// fill it with identity matrices when it's empty
+// 				if (extraNodeTransformations.size() == 0)
+// 				{
+// 					for (uint i = 0; i < numFrames; ++i)
+// 						extraNodeTransformations.push_back(node->mTransformation);
+// 				}
+// 
+// 				for (uint i = 0; i < numFrames; ++i)
+// 				{
+// 					vec3 pos = i < extraAnim->mNumPositionKeys ? extraAnim->mPositionKeys[i].mValue
+// 						: extraAnim->mPositionKeys[extraAnim->mNumPositionKeys - 1].mValue;
+// 
+// 					quat rot = i < extraAnim->mNumRotationKeys ? extraAnim->mRotationKeys[i].mValue
+// 						: extraAnim->mRotationKeys[extraAnim->mNumRotationKeys - 1].mValue;
+// 
+// 					vec3 scaling = i < extraAnim->mNumScalingKeys ? extraAnim->mScalingKeys[i].mValue
+// 						: extraAnim->mScalingKeys[extraAnim->mNumScalingKeys - 1].mValue;
+// 
+// 					// apply the parent transformation
+// 					extraNodeTransformations[i] = mat4(scaling, rot, pos) * extraNodeTransformations[i];
+// 				}
+// 			}
+// 		}
+// 	}
 
 	if (animation)
 	{
 		flag = 8; // using matrix
-		vector<mat4> nodeTransformations;
 
 		uint numFrames = std::max(animation->mNumPositionKeys,
 			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
 
 		for (uint i = 0; i < numFrames; ++i)
 		{
-			vec3 pos, scaling;
-			quat rot;
+			vec3 pos = i < animation->mNumPositionKeys ? animation->mPositionKeys[i].mValue
+				: animation->mPositionKeys[animation->mNumPositionKeys - 1].mValue;
 
-			if (i < animation->mNumPositionKeys)
-				pos = animation->mPositionKeys[i].mValue;
+			quat rot = i < animation->mNumRotationKeys ? animation->mRotationKeys[i].mValue
+				: animation->mRotationKeys[animation->mNumRotationKeys - 1].mValue;
+
+			vec3 scaling = i < animation->mNumScalingKeys ? animation->mScalingKeys[i].mValue
+				: animation->mScalingKeys[animation->mNumScalingKeys - 1].mValue;
+
+			if (extraNodeTransformations.size() > 0)
+			{
+				nodeTransformations.push_back(extraNodeTransformations[i] * mat4(scaling, rot, pos));
+			}
 			else
-				// pick the last one
-				pos = animation->mPositionKeys[animation->mNumPositionKeys - 1].mValue;
-
-			if (i < animation->mNumRotationKeys)
-				rot = animation->mRotationKeys[i].mValue;
-			else
-				// pick the last one
-				rot = animation->mRotationKeys[animation->mNumRotationKeys - 1].mValue;
-
-			if (i < animation->mNumScalingKeys)
-				scaling = animation->mScalingKeys[i].mValue;
-			else
-				// pick the last one
-				scaling = animation->mScalingKeys[animation->mNumScalingKeys - 1].mValue;
-
-			// this matrix need to be transposed to match the pod file matrix layout
-			// Assimp matrix is column-major while the pod matrix is row-major in memory
-			nodeTransformations.push_back(mat4(scaling, rot, pos).Transpose());
+			{
+				nodeTransformations.push_back(mat4(scaling, rot, pos));
+			}
 		}
-
-		// Animation Matrix, 16 floats per frame of animation
-		writeStartTag(pod::e_nodeAnimationMatrix, sizeof(nodeTransformations[0]) * nodeTransformations.size());
-		for (uint i = 0; i < nodeTransformations.size(); ++i)
-		{
-			write4ByteArray(m_fileStream, &nodeTransformations[i][0][0], 16);
-		}
-		writeEndTag(pod::e_nodeAnimationMatrix);
+	}
+ 	else if(extraNodeTransformations.size() > 0)
+ 	{
+ 		flag = 8;
+ 		for (uint i = 0; i < extraNodeTransformations.size(); ++i)
+ 		{
+ 			nodeTransformations.push_back(extraNodeTransformations[i]);
+ 		}
+ 	}
+	else
+	{
+		flag = 0;
+		nodeTransformations.push_back(mat4());
 	}
 
 	// Animation Flag
 	writeStartTag(pod::e_nodeAnimationFlags, 4);
 	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);
+
+	// Animation Matrix, 16 floats per frame of animation
+	writeStartTag(pod::e_nodeAnimationMatrix, sizeof(nodeTransformations[0]) * nodeTransformations.size());
+	for (uint i = 0; i < nodeTransformations.size(); ++i)
+	{
+		// this matrix need to be transposed to match the pod file matrix layout
+		// Assimp matrix is column-major while the pod matrix is row-major in memory
+		mat4 nodeTrans = nodeTransformations[i].Transpose();
+		write4ByteArray(m_fileStream, &nodeTrans[0][0], 16);
+	}
+	writeEndTag(pod::e_nodeAnimationMatrix);
 
 	writeEndTag(pod::e_sceneNode);
 }

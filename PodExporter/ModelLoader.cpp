@@ -1,4 +1,4 @@
-#include "ModelLoader.h"
+﻿#include "ModelLoader.h"
 #include "AnimationHelper.h"
 #include <sstream>
 #include <assimp/postprocess.h>
@@ -34,23 +34,33 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	m_fileName = fileName;
 	uint flags;
 
-	if (flag == SIMPLE)
+	switch (flag)
+	{
+	case ModelLoader::SIMPLE:
 		flags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace;
-	else if (flag == FAST)
+		break;
+	case ModelLoader::FAST:
 		flags = aiProcessPreset_TargetRealtime_Fast;
-	else if (flag == QUALITY)
+		break;
+	case ModelLoader::QUALITY:
 		flags = aiProcessPreset_TargetRealtime_Quality;
-	else if (flag == MAX_QUALITY)
+		break;
+	case ModelLoader::MAX_QUALITY:
 		flags = aiProcessPreset_TargetRealtime_MaxQuality;
+		break;
+	default:
+		break;
+	}
 
 	m_aiScene = m_importer.ReadFile(fileName, flags);
-	
 	if (!m_aiScene)
 	{
 		cout << m_importer.GetErrorString();
 		vector<ModelDataPtr> empty;
 		return empty;
 	}
+
+	displaySceneGraph(m_aiScene->mRootNode);
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation;
 	m_GlobalInverseTransform.Inverse();
@@ -97,8 +107,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	// parse other nodes, this step makes sure the mesh nodes are in the front
 	parseNoneMeshNodes(m_aiScene->mRootNode);
 
-	//displaySceneGraph(m_aiScene->mRootNode);
-
 	// load bones
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
 	{
@@ -108,7 +116,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			loadBones(mesh, modelDataVector[i]->meshData);
 		}
 	}
-	
+
 	// IMPORTANT: this step is essential, make sure the model is not in bind pose, otherwise the animation will be broken
 	if (m_aiScene->HasAnimations())
 	{
@@ -119,12 +127,14 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 		for (uint i = 0; i < modelDataVector.size(); ++i)
 		{
+			if(!m_aiScene->mMeshes[i]->HasBones()) continue;
+
 			for (uint j = 0; j < modelDataVector[i]->meshData.numVertices; ++j)
 			{
 				VertexBoneData boneData = modelDataVector[i]->meshData.bones[j];
 
 				glm::mat4 finalM(0.0f);
-				for (uint k = 0; k < 4; ++k)
+				for (uint k = 0; k < NUM_BONES_PER_VEREX; ++k)
 				{
 					float weight = boneData.Weights[k];
 
@@ -155,6 +165,9 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			}
 		}
 	}
+
+	//parseExtraNodes(m_aiScene->mRootNode);
+	collectExtraNodeAnimations();
 
 	return modelDataVector;
 }
@@ -445,26 +458,40 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 	// if the node is a child of the scene root, not a mesh node, and does not have any children, remove it
 	// e.g. light, camera, unnamed useless nodes, etc
 	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
-
-	// if the node is an assimp generated intermediate nodes
-//  	if (isIntermediateNode(pNode))
-//  	{
-// 		aiNode* cleanNode = applyChildTransform(pNode);
-// 
-// 		// remove the intermediate nodes
-// 		cleanNode->mParent = pNode->mParent;
-// 		pNode->mParent->mChildren[index] = cleanNode;
-//  	}
+  	
 
 	// ignore the node with 0 or multiple meshes, the root node
-	if (!isUselessNode /*&& !isIntermediateNode(pNode)*/ && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
+	if (!isUselessNode && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
 	{
-		m_Nodes.push_back(pNode);
+		//if(!isExtraNode(pNode))
+			m_Nodes.push_back(pNode);
 	}
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
 		parseNoneMeshNodes(pNode->mChildren[i], i);
+	}
+}
+
+void ModelLoader::parseExtraNodes(aiNode* pNode)
+{
+	if (!pNode) return;
+	// if the node is an assimp generated intermediate nodes
+	if (isExtraNode(pNode) && std::find(m_parsedExtraNodes.begin(), m_parsedExtraNodes.end(), pNode) == m_parsedExtraNodes.end())
+	{
+		aiNode* cleanNode = applyChildTransform(pNode);
+
+		cout << cleanNode->mName.C_Str() << endl;
+		DecomposeAndDisplayMat4(cleanNode->mTransformation);
+
+		// remove the intermediate nodes
+		//cleanNode->mParent = pNode->mParent;
+		//pNode->mParent->mChildren[index] = cleanNode;
+	}
+
+	for (size_t i = 0; i < pNode->mNumChildren; ++i)
+	{
+		parseExtraNodes(pNode->mChildren[i]);
 	}
 }
 
@@ -496,9 +523,10 @@ mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)
 aiNode* ModelLoader::applyChildTransform(aiNode* pNode, mat4& parentTransform)
 {
 	pNode->mTransformation = parentTransform * pNode->mTransformation;
+	m_parsedExtraNodes.push_back(pNode);
 	aiNode* result = NULL;
 
-	if (isIntermediateNode(pNode))
+	if (isExtraNode(pNode))
 	{
 		for (uint i = 0; i < pNode->mNumChildren; ++i)
 		{
@@ -514,8 +542,10 @@ aiNode* ModelLoader::applyChildTransform(aiNode* pNode, mat4& parentTransform)
 
 void ModelLoader::displaySceneGraph(aiNode* pNode, uint indent /*= 0*/)
 {
+	if(indent > 0)
+		cout << "|";
 	for (uint i = 0; i < indent; ++i)
-		cout << " ";
+		cout << "-";
 
 	cout << pNode->mName.C_Str() << endl;
 
@@ -523,8 +553,43 @@ void ModelLoader::displaySceneGraph(aiNode* pNode, uint indent /*= 0*/)
 		displaySceneGraph(pNode->mChildren[i], indent + 1);
 }
 
-bool ModelLoader::isIntermediateNode(aiNode* pNode)
+bool ModelLoader::isExtraNode(aiNode* pNode)
 {
 	std::string name = std::string(pNode->mName.C_Str());
-	return name.find("_$AssimpFbx$") != std::string::npos;
+	return isExtraNode(name);
+}
+
+bool ModelLoader::isExtraNode(string& nodeName)
+{
+	return nodeName.find("_$AssimpFbx$_") != std::string::npos;
+}
+
+aiNode* ModelLoader::getTrueParentNode(aiNode* pNode)
+{
+	aiNode* temp = pNode->mParent;
+	while (isExtraNode(temp))
+	{
+		temp = temp->mParent;
+	}
+	return temp;
+}
+
+void ModelLoader::collectExtraNodeAnimations()
+{
+	if (!m_aiScene->HasAnimations())
+		return;
+
+	for (uint i = 0; i < m_aiScene->mNumAnimations; ++ i)
+	{
+		for (uint j = 0; j < m_aiScene->mAnimations[i]->mNumChannels; ++j)
+		{
+			aiNodeAnim* a = m_aiScene->mAnimations[i]->mChannels[j];
+			std::string name = std::string(a->mNodeName.C_Str());
+			if (isExtraNode(name))
+			{
+				m_extraNodeAnimation[name] = a;
+			}
+		}
+	}
+
 }
