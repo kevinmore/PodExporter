@@ -6,6 +6,7 @@ to '\r\n', which produces one more byte than expected.                  */
 
 #include "PODWriter.h"
 #include "PVRTBoneBatches.h"
+#include "AnimationHelper.h"
 #include <cstdio>
 #include <algorithm>
 
@@ -318,9 +319,40 @@ void PODWriter::writeSceneBlock()
 			numRotationKeys = std::max(numRotationKeys, animation->mChannels[i]->mNumRotationKeys);
 			numScalingKeys = std::max(numScalingKeys, animation->mChannels[i]->mNumScalingKeys);
 		}
+		m_numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
+
+		// fill in the key frame time list
+		for (uint i = 0; i < animation->mNumChannels; ++i)
+		{
+			if (animation->mChannels[i]->mNumPositionKeys == m_numFrames)
+			{
+				for (uint j = 0; j < m_numFrames; ++j)
+				{
+					m_animationKeyFrameTimeList.push_back((float)animation->mChannels[i]->mPositionKeys[j].mTime);
+				}
+				break;
+			}
+
+			if (animation->mChannels[i]->mNumRotationKeys == m_numFrames)
+			{
+				for (uint j = 0; j < m_numFrames; ++j)
+				{
+					m_animationKeyFrameTimeList.push_back((float)animation->mChannels[i]->mRotationKeys[j].mTime);
+				}
+				break;
+			}
+
+			if (animation->mChannels[i]->mNumScalingKeys == m_numFrames)
+			{
+				for (uint j = 0; j < m_numFrames; ++j)
+				{
+					m_animationKeyFrameTimeList.push_back((float)animation->mChannels[i]->mScalingKeys[j].mTime);
+				}
+				break;
+			}
+		}
 
 		// Num. Frames
-		m_numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
 		writeStartTag(pod::e_sceneNumFrames, 4);
 		write4Bytes(m_fileStream, m_numFrames);
 		writeEndTag(pod::e_sceneNumFrames);
@@ -329,7 +361,7 @@ void PODWriter::writeSceneBlock()
 		uint32 fps = m_numFrames / static_cast<uint32>(animation->mDuration);
 
 		//special case
-		if (fps == 0)
+		if (fps < 10)
 		{
 			fps = animation->mTicksPerSecond != 0 ? uint32(animation->mTicksPerSecond) : 30;
 		}
@@ -634,12 +666,7 @@ void PODWriter::writeMeshBlock(uint index)
 void PODWriter::writeNodeBlock(uint index)
 {
 	aiNode* node = m_Nodes[index];
-// 	bool isChildOfExtraNode = false;
-// 	if (node->mParent)
-// 	{
-// 		m_modelLoader.isExtraNode(node->mParent);
-// 	}
-	//cout << "\n" << index << " " << node->mName.C_Str();
+	cout << "\n" << index << " " << node->mName.C_Str();
 
 	// write node block
 	writeStartTag(pod::e_sceneNode, 0);
@@ -672,18 +699,7 @@ void PODWriter::writeNodeBlock(uint index)
 			break;
 		}
 	}
-//  	if (parentIdx == -1 && isChildOfExtraNode)
-//  	{
-//  		aiNode* trueParent = m_modelLoader.getTrueParentNode(node);
-//  		for (uint32 i = 0; i < m_Nodes.size(); ++i)
-//  		{
-//  			if (m_Nodes[i] == trueParent)
-//  			{
-//  				parentIdx = i;
-//  				break;
-//  			}
-//  		}
-//  	}
+
 	writeStartTag(pod::e_nodeParentIndex, 4);
 	write4Bytes(m_fileStream, parentIdx);
 	writeEndTag(pod::e_nodeParentIndex);
@@ -696,109 +712,34 @@ void PODWriter::writeNodeBlock(uint index)
 	}
 
 	// Node Animation
+	AnimationHelper helper;
 	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
-	aiNodeAnim* animation = NULL;
-	for (uint i = 0; i < anim->mNumChannels; ++i)
-	{
-		if (anim->mChannels[i]->mNodeName == node->mName)
-		{
-			animation = anim->mChannels[i];
-			break;
-		}
-	}
+	aiNodeAnim* animation = helper.findNodeAnim(anim, node->mName);
 
-	uint32 flag;
-	vector<mat4> nodeTransformations, extraNodeTransformations;
-
-// 	if (isChildOfExtraNode)
-// 	{
-// 		map<string, aiNodeAnim*> extraAnimationsMap = m_modelLoader.getExtraNodeAnimationMap();
-// 
-// 		// find extra animations
-// 		vector<aiNode*> parentNodes;
-// 		aiNode* temp = node->mParent;
-// 		while (m_modelLoader.isExtraNode(temp))
-// 		{
-// 			parentNodes.push_back(temp);
-// 			temp = temp->mParent;
-// 		}
-// 
-// 		for (uint i = 0; i < parentNodes.size(); ++i)
-// 		{
-// 			string tempNodeName = string(parentNodes[i]->mName.C_Str());
-// 			if (extraAnimationsMap.find(tempNodeName) != extraAnimationsMap.end())
-// 			{
-// 				aiNodeAnim* extraAnim = extraAnimationsMap[tempNodeName];
-// 
-// 				uint numFrames = std::max(extraAnim->mNumPositionKeys,
-// 					std::max(extraAnim->mNumRotationKeys, extraAnim->mNumScalingKeys));
-// 
-// 				// fill it with identity matrices when it's empty
-// 				if (extraNodeTransformations.size() == 0)
-// 				{
-// 					for (uint i = 0; i < numFrames; ++i)
-// 						extraNodeTransformations.push_back(node->mTransformation);
-// 				}
-// 
-// 				for (uint i = 0; i < numFrames; ++i)
-// 				{
-// 					vec3 pos = i < extraAnim->mNumPositionKeys ? extraAnim->mPositionKeys[i].mValue
-// 						: extraAnim->mPositionKeys[extraAnim->mNumPositionKeys - 1].mValue;
-// 
-// 					quat rot = i < extraAnim->mNumRotationKeys ? extraAnim->mRotationKeys[i].mValue
-// 						: extraAnim->mRotationKeys[extraAnim->mNumRotationKeys - 1].mValue;
-// 
-// 					vec3 scaling = i < extraAnim->mNumScalingKeys ? extraAnim->mScalingKeys[i].mValue
-// 						: extraAnim->mScalingKeys[extraAnim->mNumScalingKeys - 1].mValue;
-// 
-// 					// apply the parent transformation
-// 					extraNodeTransformations[i] = mat4(scaling, rot, pos) * extraNodeTransformations[i];
-// 				}
-// 			}
-// 		}
-// 	}
-
+	vector<mat4> nodeTransformations;
 	if (animation)
 	{
-		uint numFrames = std::max(animation->mNumPositionKeys,
-			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
-		cout << "num frames: " << numFrames << endl;
-		for (uint i = 0; i < numFrames; ++i)
+		// Re-sampling the animation
+		for (uint i = 0; i < m_numFrames; ++i)
 		{
-			vec3 pos = i < animation->mNumPositionKeys ? animation->mPositionKeys[i].mValue
-				: animation->mPositionKeys[animation->mNumPositionKeys - 1].mValue;
+			vec3 pos, scaling;
+			quat rot;
 
-			quat rot = i < animation->mNumRotationKeys ? animation->mRotationKeys[i].mValue
-				: animation->mRotationKeys[animation->mNumRotationKeys - 1].mValue;
+			float frameTime = m_animationKeyFrameTimeList[i];
+			helper.calcInterpolatedPosition(pos, frameTime, animation);
+			helper.calcInterpolatedRotation(rot, frameTime, animation);
+			helper.calcInterpolatedScaling(scaling, frameTime, animation);
 
-			vec3 scaling = i < animation->mNumScalingKeys ? animation->mScalingKeys[i].mValue
-				: animation->mScalingKeys[animation->mNumScalingKeys - 1].mValue;
-
-// 			if (extraNodeTransformations.size() > 0)
-// 			{
-// 				nodeTransformations.push_back(extraNodeTransformations[i] * mat4(scaling, rot, pos));
-// 			}
-// 			else
-			{
-				nodeTransformations.push_back(mat4(scaling, rot, pos));
-			}
+			nodeTransformations.push_back(mat4(scaling, rot, pos));
 		}
 	}
-//  	else if(extraNodeTransformations.size() > 0)
-//  	{
-//  		flag = 8;
-//  		for (uint i = 0; i < extraNodeTransformations.size(); ++i)
-//  		{
-//  			nodeTransformations.push_back(extraNodeTransformations[i]);
-//  		}
-//  	}
 	else
 	{
 		nodeTransformations.push_back(node->mTransformation);
 	}
 
 	// Animation Flag
-	flag = nodeTransformations.size() > 1 ? 8 : 0;
+	uint32 flag = nodeTransformations.size() > 1 ? 8 : 0;
 	writeStartTag(pod::e_nodeAnimationFlags, 4);
 	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);

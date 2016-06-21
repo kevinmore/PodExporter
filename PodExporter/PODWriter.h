@@ -37,6 +37,7 @@ private:
 	ModelLoader m_modelLoader;
 	vector<ModelDataPtr> m_modelDataVec;
 	vector<aiNode*> m_Nodes;
+	vector<float> m_animationKeyFrameTimeList;
 	bool m_exportSkinningData;
 	bool m_exportAnimations;
 	ExportOptions m_exportOptions;

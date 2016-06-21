@@ -75,3 +75,104 @@ aiNodeAnim* AnimationHelper::findNodeAnim(aiAnimation* pAnimation, aiString node
 
 	return NULL;
 }
+
+uint AnimationHelper::findScaling(float AnimationTime, const aiNodeAnim* pNodeAnim)
+{
+	for (uint i = 0; i < pNodeAnim->mNumScalingKeys - 1; ++i) 
+	{
+		if (AnimationTime < pNodeAnim->mScalingKeys[i + 1].mTime) 
+		{
+			return i;
+		}
+	}
+
+	return 0;
+}
+
+uint AnimationHelper::findRotation(float AnimationTime, const aiNodeAnim* pNodeAnim)
+{
+	for (uint i = 0; i < pNodeAnim->mNumRotationKeys - 1; ++i)
+	{
+		if (AnimationTime < pNodeAnim->mRotationKeys[i + 1].mTime)
+		{
+			return i;
+		}
+	}
+
+	return 0;
+}
+
+uint AnimationHelper::findPosition(float AnimationTime, const aiNodeAnim* pNodeAnim)
+{
+	for (uint i = 0; i < pNodeAnim->mNumPositionKeys - 1; ++i)
+	{
+		if (AnimationTime < pNodeAnim->mPositionKeys[i + 1].mTime)
+		{
+			return i;
+		}
+	}
+
+	return 0;
+}
+
+void AnimationHelper::calcInterpolatedScaling(vec3& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
+{
+	if (pNodeAnim->mNumScalingKeys == 1) 
+	{
+		Out = pNodeAnim->mScalingKeys[0].mValue;
+		return;
+	}
+
+	uint ScalingIndex = findScaling(AnimationTime, pNodeAnim);
+	uint NextScalingIndex = (ScalingIndex + 1);
+	//assert(NextScalingIndex < pNodeAnim->mNumScalingKeys);
+	float DeltaTime = (float)(pNodeAnim->mScalingKeys[NextScalingIndex].mTime - pNodeAnim->mScalingKeys[ScalingIndex].mTime);
+	float Factor = (AnimationTime - (float)pNodeAnim->mScalingKeys[ScalingIndex].mTime) / DeltaTime;
+	//assert(Factor >= 0.0f && Factor <= 1.0f);
+	const aiVector3D& Start = pNodeAnim->mScalingKeys[ScalingIndex].mValue;
+	const aiVector3D& End = pNodeAnim->mScalingKeys[NextScalingIndex].mValue;
+	aiVector3D Delta = End - Start;
+	Out = Start + Factor * Delta;
+}
+
+void AnimationHelper::calcInterpolatedRotation(quat& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
+{
+	// we need at least two values to interpolate...
+	if (pNodeAnim->mNumRotationKeys == 1) 
+	{
+		Out = pNodeAnim->mRotationKeys[0].mValue;
+		return;
+	}
+
+	uint RotationIndex = findRotation(AnimationTime, pNodeAnim);
+	uint NextRotationIndex = (RotationIndex + 1);
+	//assert(NextRotationIndex < pNodeAnim->mNumRotationKeys);
+	float DeltaTime = (float)(pNodeAnim->mRotationKeys[NextRotationIndex].mTime - pNodeAnim->mRotationKeys[RotationIndex].mTime);
+	float Factor = (AnimationTime - (float)pNodeAnim->mRotationKeys[RotationIndex].mTime) / DeltaTime;
+	//assert(Factor >= 0.0f && Factor <= 1.0f);
+	const aiQuaternion& StartRotationQ = pNodeAnim->mRotationKeys[RotationIndex].mValue;
+	const aiQuaternion& EndRotationQ = pNodeAnim->mRotationKeys[NextRotationIndex].mValue;
+	aiQuaternion::Interpolate(Out, StartRotationQ, EndRotationQ, Factor);
+	Out = Out.Normalize();
+}
+
+void AnimationHelper::calcInterpolatedPosition(vec3& Out, float AnimationTime, const aiNodeAnim* pNodeAnim)
+{
+	if (pNodeAnim->mNumPositionKeys == 1) 
+	{
+		Out = pNodeAnim->mPositionKeys[0].mValue;
+		return;
+	}
+
+	uint PositionIndex = findPosition(AnimationTime, pNodeAnim);
+	uint NextPositionIndex = (PositionIndex + 1);
+	//assert(NextPositionIndex < pNodeAnim->mNumPositionKeys);
+	float DeltaTime = (float)(pNodeAnim->mPositionKeys[NextPositionIndex].mTime - pNodeAnim->mPositionKeys[PositionIndex].mTime);
+	float Factor = (AnimationTime - (float)pNodeAnim->mPositionKeys[PositionIndex].mTime) / DeltaTime;
+	//assert(Factor >= 0.0f && Factor <= 1.0f);
+	const aiVector3D& Start = pNodeAnim->mPositionKeys[PositionIndex].mValue;
+	const aiVector3D& End = pNodeAnim->mPositionKeys[NextPositionIndex].mValue;
+	aiVector3D Delta = End - Start;
+	Out = Start + Factor * Delta;
+}
+

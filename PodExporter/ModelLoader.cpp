@@ -60,7 +60,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		return empty;
 	}
 
-	displaySceneGraph(m_aiScene->mRootNode);
+	//displaySceneGraph(m_aiScene->mRootNode);
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation;
 	m_GlobalInverseTransform.Inverse();
@@ -410,9 +410,14 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 	// e.g. light, camera, unnamed useless nodes, etc
 	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
   	
+	// if it's the root node, check if it holds an identity transformation matrix
+	if (pNode == m_aiScene->mRootNode && pNode->mTransformation.IsIdentity())
+	{
+		isUselessNode = true;
+	}
 
 	// ignore the node with 0 or multiple meshes
-	if (!isUselessNode && pNode->mNumMeshes != 1/* && pNode->mParent != NULL*/)
+	if (!isUselessNode && pNode->mNumMeshes != 1)
 	{
 		//if(!isExtraNode(pNode))
 			m_Nodes.push_back(pNode);
