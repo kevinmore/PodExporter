@@ -75,13 +75,13 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	numVertices = 0;
 	numIndices = 0;
-	vector<ModelDataPtr> modelDataVector;
-	modelDataVector.resize(m_aiScene->mNumMeshes);
+	
+	m_modelDataVector.resize(m_aiScene->mNumMeshes);
 
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
 	{
 		ModelDataPtr md(new ModelData());
-		modelDataVector[i] = ModelDataPtr(md);
+		m_modelDataVector[i] = ModelDataPtr(md);
 
 		md->meshData = loadMesh(i, numVertices, numIndices);
 		md->materialData = loadMaterial(m_aiScene->mMaterials[m_aiScene->mMeshes[i]->mMaterialIndex]);
@@ -97,10 +97,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 			meshNode = m_aiScene->mRootNode->FindNode(md->meshData.name.c_str());
 		}
 
-		// TODO: NEED MORE TESTS
-		//md->meshData.unpackMatrix = calculateGlobalTransform(meshNode);
-		md->meshData.unpackMatrix = meshNode->mTransformation;
-
 		m_Nodes.push_back(meshNode);
 	}
 
@@ -113,63 +109,18 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		aiMesh* mesh = m_aiScene->mMeshes[i];
 		if (mesh->HasBones())
 		{
-			loadBones(mesh, modelDataVector[i]->meshData);
+			loadBones(mesh, m_modelDataVector[i]->meshData);
 		}
 	}
 
 	// IMPORTANT: this step is essential, make sure the model is not in bind pose, otherwise the animation will be broken
-	if (m_aiScene->HasAnimations())
-	{
-		AnimationHelper helper(m_GlobalInverseTransform, m_BoneOffsetMatrixMapping);
-
-		// apply the first frame pose (frame index = 0)
-		map<string, mat4> boneFinalTransforms = helper.getBoneFinalTransformsAtFrame(0, m_aiScene->mAnimations[0], m_aiScene->mRootNode);
-
-		for (uint i = 0; i < modelDataVector.size(); ++i)
-		{
-			if(!m_aiScene->mMeshes[i]->HasBones()) continue;
-
-			for (uint j = 0; j < modelDataVector[i]->meshData.numVertices; ++j)
-			{
-				VertexBoneData boneData = modelDataVector[i]->meshData.bones[j];
-
-				glm::mat4 finalM(0.0f);
-				for (uint k = 0; k < NUM_BONES_PER_VEREX; ++k)
-				{
-					float weight = boneData.Weights[k];
-
-					if (weight == 0.0f)
-						continue;
-
-					std::string boneName(m_Nodes[boneData.IDs[k]]->mName.C_Str());
-					glm::mat4 weightedMat = weight * toGLMMatrix4x4(boneFinalTransforms[boneName]);
-
-					finalM += weightedMat;
-				}
-
-				vec3 oldPos = modelDataVector[i]->meshData.positions[j];
-				glm::vec4 newPos = glm::vec4(oldPos.x, oldPos.y, oldPos.z, 1.0f) * finalM; // THE ORDER MATTERS!
-				modelDataVector[i]->meshData.positions[j] = vec3(newPos.x, newPos.y, newPos.z);
-				
-				vec3 oldNormal = modelDataVector[i]->meshData.normals[j];
-				glm::vec4 newNormal = glm::vec4(oldNormal.x, oldNormal.y, oldNormal.z, 0.0f) * finalM;
-				modelDataVector[i]->meshData.normals[j] = vec3(newNormal.x, newNormal.y, newNormal.z);
-				
-				vec3 oldTagent = modelDataVector[i]->meshData.tangents[j];
-				glm::vec4 newTagent = glm::vec4(oldTagent.x, oldTagent.y, oldTagent.z, 0.0f) * finalM;
-				modelDataVector[i]->meshData.tangents[j] = vec3(newTagent.x, newTagent.y, newTagent.z);
-				
-				vec3 oldBiTagent = modelDataVector[i]->meshData.bitangents[j];
-				glm::vec4 newBiTagent = glm::vec4(oldBiTagent.x, oldBiTagent.y, oldBiTagent.z, 0.0f) * finalM;
-				modelDataVector[i]->meshData.bitangents[j] = vec3(newBiTagent.x, newBiTagent.y, newBiTagent.z);
-			}
-		}
-	}
+	// apply the first frame pose
+	applyPoseAtFrame(0);
 
 	//parseExtraNodes(m_aiScene->mRootNode);
-	collectExtraNodeAnimations();
+	//collectExtraNodeAnimations();
 
-	return modelDataVector;
+	return m_modelDataVector;
 }
 
 string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
@@ -460,8 +411,8 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
   	
 
-	// ignore the node with 0 or multiple meshes, the root node
-	if (!isUselessNode && pNode->mNumMeshes != 1 && pNode->mParent != NULL)
+	// ignore the node with 0 or multiple meshes
+	if (!isUselessNode && pNode->mNumMeshes != 1/* && pNode->mParent != NULL*/)
 	{
 		//if(!isExtraNode(pNode))
 			m_Nodes.push_back(pNode);
@@ -510,7 +461,7 @@ aiNode* ModelLoader::getNode(const char* meshName, vector<aiNode*>& source)
 
 mat4 ModelLoader::calculateGlobalTransform(aiNode* pNode)
 {
-	mat4 result;
+	mat4 result = pNode->mTransformation;
 	while (pNode->mParent)
 	{
 		result = pNode->mParent->mTransformation * result;
@@ -592,4 +543,54 @@ void ModelLoader::collectExtraNodeAnimations()
 		}
 	}
 
+}
+
+void ModelLoader::applyPoseAtFrame(uint frameIndex)
+{
+	if (m_aiScene->HasAnimations())
+	{
+		AnimationHelper helper(m_GlobalInverseTransform, m_BoneOffsetMatrixMapping);
+
+		map<string, mat4> boneFinalTransforms = helper.getBoneFinalTransformsAtFrame(frameIndex, m_aiScene->mAnimations[0], m_aiScene->mRootNode);
+
+		for (uint i = 0; i < m_modelDataVector.size(); ++i)
+		{
+			if (!m_aiScene->mMeshes[i]->HasBones()) continue;
+
+			for (uint j = 0; j < m_modelDataVector[i]->meshData.numVertices; ++j)
+			{
+				VertexBoneData boneData = m_modelDataVector[i]->meshData.bones[j];
+
+				glm::mat4 finalM(0.0f);
+				for (uint k = 0; k < NUM_BONES_PER_VEREX; ++k)
+				{
+					float weight = boneData.Weights[k];
+
+					if (weight == 0.0f)
+						continue;
+
+					std::string boneName(m_Nodes[boneData.IDs[k]]->mName.C_Str());
+					glm::mat4 weightedMat = weight * toGLMMatrix4x4(boneFinalTransforms[boneName]);
+
+					finalM += weightedMat;
+				}
+
+				vec3 oldPos = m_modelDataVector[i]->meshData.positions[j];
+				glm::vec4 newPos = glm::vec4(oldPos.x, oldPos.y, oldPos.z, 1.0f) * finalM; // THE ORDER MATTERS!
+				m_modelDataVector[i]->meshData.positions[j] = vec3(newPos.x, newPos.y, newPos.z);
+
+				vec3 oldNormal = m_modelDataVector[i]->meshData.normals[j];
+				glm::vec4 newNormal = glm::vec4(oldNormal.x, oldNormal.y, oldNormal.z, 0.0f) * finalM;
+				m_modelDataVector[i]->meshData.normals[j] = vec3(newNormal.x, newNormal.y, newNormal.z);
+
+				vec3 oldTagent = m_modelDataVector[i]->meshData.tangents[j];
+				glm::vec4 newTagent = glm::vec4(oldTagent.x, oldTagent.y, oldTagent.z, 0.0f) * finalM;
+				m_modelDataVector[i]->meshData.tangents[j] = vec3(newTagent.x, newTagent.y, newTagent.z);
+
+				vec3 oldBiTagent = m_modelDataVector[i]->meshData.bitangents[j];
+				glm::vec4 newBiTagent = glm::vec4(oldBiTagent.x, oldBiTagent.y, oldBiTagent.z, 0.0f) * finalM;
+				m_modelDataVector[i]->meshData.bitangents[j] = vec3(newBiTagent.x, newBiTagent.y, newBiTagent.z);
+			}
+		}
+	}
 }

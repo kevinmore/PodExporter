@@ -47,7 +47,6 @@ struct MeshData
 	unsigned int numIndices;
 	unsigned int baseVertex;
 	unsigned int baseIndex;
-	mat4 unpackMatrix;
 
 	/*
 	*	Vertex Data Containers
@@ -119,7 +118,7 @@ public:
 	string& getTexture(uint index) { return m_texturePaths[index]; }
 	map<string, unsigned short>& getBoneMap() { return m_BoneMapping; }
 	map<string, mat4>& getBoneOffsetMatrixMap() { return m_BoneOffsetMatrixMapping; }
-	map<string, aiNodeAnim*> getExtraNodeAnimationMap() { return m_extraNodeAnimation; }
+	map<string, aiNodeAnim*>& getExtraNodeAnimationMap() { return m_extraNodeAnimation; }
 	bool isExtraNode(aiNode* pNode);
 	bool isExtraNode(string& nodeName);
 	aiNode* getTrueParentNode(aiNode* pNode);
@@ -145,6 +144,8 @@ private:
 
 	void collectExtraNodeAnimations();
 
+	void applyPoseAtFrame(uint frameIndex);
+
 	/*
 	*	Clean up
 	*/
@@ -158,6 +159,7 @@ private:
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
 	mat4 m_GlobalInverseTransform;
+	vector<ModelDataPtr> m_modelDataVector;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
 	map<string, mat4> m_BoneOffsetMatrixMapping; // maps a bone name to its offset matrix
 	map<string, aiNodeAnim*> m_extraNodeAnimation; // maps an extra node to its animation

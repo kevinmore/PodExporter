@@ -380,9 +380,17 @@ void PODWriter::writeMeshBlock(uint index)
 	writeStartTag(pod::e_sceneMesh, 0);
 
 	// Unpack Matrix
-	//writeStartTag(pod::e_meshUnpackMatrix, 4 * 16);
-	//writeBytes(m_fileStream, meshData.unpackMatrix.a1, 4 * 16);
-	//writeEndTag(pod::e_meshUnpackMatrix);
+	// From the PowerVR Support:
+	/************************************************************************/
+	/* The unpack matrix is just to allow to export vertices using types lower than 32 bits 
+	with a greater level of accuracy. It is a 4x4 transformation matrix with offset (position) 
+	and scaling per coordinate. I think in your case, if you export all values as floats you 
+	can ignore it and set it to identity.                                   */
+	/************************************************************************/
+	writeStartTag(pod::e_meshUnpackMatrix, 4 * 16);
+	mat4 transposed;
+	write4ByteArray(m_fileStream, &transposed[0][0], 16);
+	writeEndTag(pod::e_meshUnpackMatrix);
 
 	// Num. Faces
 	writeStartTag(pod::e_meshNumFaces, 4);
@@ -410,10 +418,8 @@ void PODWriter::writeMeshBlock(uint index)
 	if (m_exportSkinningData)
 	{
 		// construct the interleaved data list
-		uint32 stride = sizeof(positionBuffer[0]) + sizeof(boneBuffer[0]);
-		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
-		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
-		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
+		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) 
+			+ sizeof(bitangentBuffer[0]) + sizeof(boneBuffer[0]);
 		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
 		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
@@ -421,15 +427,9 @@ void PODWriter::writeMeshBlock(uint index)
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			addByteIntoVector(positionBuffer[i], interleavedDataList);
-
-			if (normalBuffer.size() > 0)
-				addByteIntoVector(normalBuffer[i], interleavedDataList);
-
-			if (tangentBuffer.size() > 0)
-				addByteIntoVector(tangentBuffer[i], interleavedDataList);
-
-			if (bitangentBuffer.size() > 0)
-				addByteIntoVector(bitangentBuffer[i], interleavedDataList);
+			addByteIntoVector(normalBuffer[i], interleavedDataList);
+			addByteIntoVector(tangentBuffer[i], interleavedDataList);
+			addByteIntoVector(bitangentBuffer[i], interleavedDataList);
 
 			if (uvBuffer.size() > 0)
 				addByteIntoVector(uvBuffer[i], interleavedDataList);
@@ -504,29 +504,20 @@ void PODWriter::writeMeshBlock(uint index)
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshVertexList);
 
-		if (normalBuffer.size() > 0)
-		{
-			writeStartTag(pod::e_meshNormalList, 0);
-			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-			offset += DataType::size(DataType::Float32) * 3;
-			writeEndTag(pod::e_meshNormalList);
-		}
+		writeStartTag(pod::e_meshNormalList, 0);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshNormalList);
 
-		if (tangentBuffer.size() > 0)
-		{
-			writeStartTag(pod::e_meshTangentList, 0);
-			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-			offset += DataType::size(DataType::Float32) * 3;
-			writeEndTag(pod::e_meshTangentList);
-		}
+		writeStartTag(pod::e_meshTangentList, 0);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshTangentList);
 
-		if (bitangentBuffer.size() > 0)
-		{
-			writeStartTag(pod::e_meshBinormalList, 0);
-			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-			offset += DataType::size(DataType::Float32) * 3;
-			writeEndTag(pod::e_meshBinormalList);
-		}
+		writeStartTag(pod::e_meshBinormalList, 0);
+		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+		offset += DataType::size(DataType::Float32) * 3;
+		writeEndTag(pod::e_meshBinormalList);
 
 		if (uvBuffer.size() > 0)
 		{
@@ -563,11 +554,8 @@ void PODWriter::writeMeshBlock(uint index)
 
 		// Interleaved Data List
 		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy
-		uint32 stride = sizeof(positionBuffer[0]);
+		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(bitangentBuffer[0]);
 
-		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
-		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
-		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
 		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
 		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
@@ -575,15 +563,9 @@ void PODWriter::writeMeshBlock(uint index)
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			writeBytes(m_fileStream, positionBuffer[i]);
-
-			if (normalBuffer.size() > 0)
-				writeBytes(m_fileStream, normalBuffer[i]);
-
-			if (tangentBuffer.size() > 0)
-				writeBytes(m_fileStream, tangentBuffer[i]);
-
-			if (bitangentBuffer.size() > 0)
-				writeBytes(m_fileStream, bitangentBuffer[i]);
+			writeBytes(m_fileStream, normalBuffer[i]);
+			writeBytes(m_fileStream, tangentBuffer[i]);
+			writeBytes(m_fileStream, bitangentBuffer[i]);
 
 			if (uvBuffer.size() > 0)
 				writeBytes(m_fileStream, uvBuffer[i]);
@@ -657,7 +639,7 @@ void PODWriter::writeNodeBlock(uint index)
 // 	{
 // 		m_modelLoader.isExtraNode(node->mParent);
 // 	}
-	cout << "\n" << index << " " << node->mName.C_Str();
+	//cout << "\n" << index << " " << node->mName.C_Str();
 
 	// write node block
 	writeStartTag(pod::e_sceneNode, 0);
@@ -778,11 +760,9 @@ void PODWriter::writeNodeBlock(uint index)
 
 	if (animation)
 	{
-		flag = 8; // using matrix
-
 		uint numFrames = std::max(animation->mNumPositionKeys,
 			std::max(animation->mNumRotationKeys, animation->mNumScalingKeys));
-
+		cout << "num frames: " << numFrames << endl;
 		for (uint i = 0; i < numFrames; ++i)
 		{
 			vec3 pos = i < animation->mNumPositionKeys ? animation->mPositionKeys[i].mValue
@@ -794,31 +774,31 @@ void PODWriter::writeNodeBlock(uint index)
 			vec3 scaling = i < animation->mNumScalingKeys ? animation->mScalingKeys[i].mValue
 				: animation->mScalingKeys[animation->mNumScalingKeys - 1].mValue;
 
-			if (extraNodeTransformations.size() > 0)
-			{
-				nodeTransformations.push_back(extraNodeTransformations[i] * mat4(scaling, rot, pos));
-			}
-			else
+// 			if (extraNodeTransformations.size() > 0)
+// 			{
+// 				nodeTransformations.push_back(extraNodeTransformations[i] * mat4(scaling, rot, pos));
+// 			}
+// 			else
 			{
 				nodeTransformations.push_back(mat4(scaling, rot, pos));
 			}
 		}
 	}
- 	else if(extraNodeTransformations.size() > 0)
- 	{
- 		flag = 8;
- 		for (uint i = 0; i < extraNodeTransformations.size(); ++i)
- 		{
- 			nodeTransformations.push_back(extraNodeTransformations[i]);
- 		}
- 	}
+//  	else if(extraNodeTransformations.size() > 0)
+//  	{
+//  		flag = 8;
+//  		for (uint i = 0; i < extraNodeTransformations.size(); ++i)
+//  		{
+//  			nodeTransformations.push_back(extraNodeTransformations[i]);
+//  		}
+//  	}
 	else
 	{
-		flag = 0;
-		nodeTransformations.push_back(mat4());
+		nodeTransformations.push_back(node->mTransformation);
 	}
 
 	// Animation Flag
+	flag = nodeTransformations.size() > 1 ? 8 : 0;
 	writeStartTag(pod::e_nodeAnimationFlags, 4);
 	write4Bytes(m_fileStream, flag);
 	writeEndTag(pod::e_nodeAnimationFlags);
