@@ -64,17 +64,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation;
 	m_GlobalInverseTransform.Inverse();
-
-	uint numVertices = 0, numIndices = 0, numFaces = 0;
-	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
-	{
-		numVertices += m_aiScene->mMeshes[i]->mNumVertices;
-		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
-		numFaces += m_aiScene->mMeshes[i]->mNumFaces;
-	}
-
-	numVertices = 0;
-	numIndices = 0;
 	
 	m_modelDataVector.resize(m_aiScene->mNumMeshes);
 
@@ -83,12 +72,8 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		ModelDataPtr md(new ModelData());
 		m_modelDataVector[i] = ModelDataPtr(md);
 
-		md->meshData = loadMesh(i, numVertices, numIndices);
+		md->meshData = loadMesh(i);
 		md->materialData = loadMaterial(m_aiScene->mMaterials[m_aiScene->mMeshes[i]->mMaterialIndex]);
-
-		numVertices += m_aiScene->mMeshes[i]->mNumVertices;
-		numIndices += m_aiScene->mMeshes[i]->mNumFaces * 3;
-		numFaces += m_aiScene->mMeshes[i]->mNumFaces;
 
 		aiNode* meshNode = getNode(md->meshData.name.c_str(), m_subMeshNodes);
 		
@@ -109,7 +94,7 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		aiMesh* mesh = m_aiScene->mMeshes[i];
 		if (mesh->HasBones())
 		{
-			loadBones(mesh, m_modelDataVector[i]->meshData);
+			loadBones(i, m_modelDataVector[i]->meshData);
 		}
 	}
 
@@ -178,7 +163,7 @@ string ModelLoader::getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode)
 void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data)
 {
 	// Populate the index buffer
-	uint numNotsupportedFaces = 0;
+	vector<unsigned int> unSupportedIndices;
 	for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
 	{
 		const aiFace& face = mesh->mFaces[i];
@@ -186,7 +171,11 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 		if (face.mNumIndices != 3)
 		{
 			cout << "Unsupported number of indices per face " << face.mNumIndices << endl;
-			++numNotsupportedFaces;
+
+			for (unsigned int j = 0; j < face.mNumIndices; ++j)
+			{
+				unSupportedIndices.push_back(face.mIndices[j]);
+			}
 		}
 		else
 		{
@@ -199,6 +188,19 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 	// Populate the vertex attribute vectors
 	for (uint i = 0; i < mesh->mNumVertices; ++i)
 	{
+		// pass the unsupported vertices
+		bool skip = false;
+		for (uint j = 0; j < unSupportedIndices.size(); ++j)
+		{
+			if (i == unSupportedIndices[j])
+			{
+				skip = true;
+				break;
+			}
+		}
+
+		if(skip) continue;
+
 		data.positions.push_back(mesh->mVertices[i]);
 
 		if (mesh->HasNormals())
@@ -225,11 +227,17 @@ void ModelLoader::readVertexAttributes(unsigned int index, const aiMesh* mesh, M
 		}
 	}
 
+
+	data.numIndices = data.indices.size();
+	data.numFaces = data.indices.size() / 3;
+	data.numVertices = data.positions.size();
 }
 
-void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
+void ModelLoader::loadBones(unsigned int index, MeshData& data)
 {
-	data.bones.resize(paiMesh->mNumVertices);
+	aiMesh* paiMesh = m_aiScene->mMeshes[index];
+	data.bones.resize(m_modelDataVector[index]->meshData.numVertices);
+
 	for (uint i = 0; i < paiMesh->mNumBones; ++i)
 	{
 		unsigned short boneIndex = 0;
@@ -258,18 +266,13 @@ void ModelLoader::loadBones(const aiMesh* paiMesh, MeshData& data)
 	}
 }
 
-MeshData ModelLoader::loadMesh(unsigned int index, unsigned int baseVertex, unsigned int baseIndex)
+MeshData ModelLoader::loadMesh(unsigned int index)
 {
 	MeshData data;
 	aiMesh* mesh = m_aiScene->mMeshes[index];
 
 	data.name = getMeshNameFromNode(index, m_aiScene->mRootNode);
-	data.numVertices = mesh->mNumVertices;
-	data.numFaces = mesh->mNumFaces;
-	data.numIndices = mesh->mNumFaces * 3;
-	data.baseVertex = baseVertex;
-	data.baseIndex = baseIndex;
-
+	
 	readVertexAttributes(index, mesh, data);
 
 	return data;

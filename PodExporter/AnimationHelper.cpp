@@ -1,6 +1,5 @@
 #include "AnimationHelper.h"
 
-
 AnimationHelper::AnimationHelper(mat4& globalInverse, map<string, mat4>& offsetMapping)
 {
 	m_globalInverseMatrix = globalInverse;

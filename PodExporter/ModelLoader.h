@@ -45,8 +45,6 @@ struct MeshData
 	unsigned int numVertices;
 	unsigned int numFaces;
 	unsigned int numIndices;
-	unsigned int baseVertex;
-	unsigned int baseIndex;
 
 	/*
 	*	Vertex Data Containers
@@ -127,10 +125,10 @@ private:
 	/*
 	*	Methods to process the model file
 	*/
-	MeshData     loadMesh(unsigned int index, unsigned int baseVertex, unsigned int baseIndex);
+	MeshData     loadMesh(unsigned int index);
 	MaterialData loadMaterial(const aiMaterial* material);
 	TextureData  loadTexture(const aiMaterial* material);
-	void loadBones(const aiMesh* paiMesh, MeshData& data);
+	void loadBones(unsigned int index, MeshData& data);
 	void readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);

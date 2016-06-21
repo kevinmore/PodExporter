@@ -450,18 +450,24 @@ void PODWriter::writeMeshBlock(uint index)
 	if (m_exportSkinningData)
 	{
 		// construct the interleaved data list
-		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) 
-			+ sizeof(bitangentBuffer[0]) + sizeof(boneBuffer[0]);
-		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
-		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
+		uint32 stride = sizeof(positionBuffer[0]) + sizeof(boneBuffer[0]);
+		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
+		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
+		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
 
 		vector<char> interleavedDataList;
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			addByteIntoVector(positionBuffer[i], interleavedDataList);
-			addByteIntoVector(normalBuffer[i], interleavedDataList);
-			addByteIntoVector(tangentBuffer[i], interleavedDataList);
-			addByteIntoVector(bitangentBuffer[i], interleavedDataList);
+
+			if (normalBuffer.size() > 0)
+				addByteIntoVector(normalBuffer[i], interleavedDataList);
+
+			if (tangentBuffer.size() > 0)
+				addByteIntoVector(tangentBuffer[i], interleavedDataList);
+
+			if (bitangentBuffer.size() > 0)
+				addByteIntoVector(bitangentBuffer[i], interleavedDataList);
 
 			if (uvBuffer.size() > 0)
 				addByteIntoVector(uvBuffer[i], interleavedDataList);
@@ -536,20 +542,29 @@ void PODWriter::writeMeshBlock(uint index)
 		offset += DataType::size(DataType::Float32) * 3;
 		writeEndTag(pod::e_meshVertexList);
 
-		writeStartTag(pod::e_meshNormalList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshNormalList);
+		if (normalBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshNormalList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshNormalList);
+		}
+		
+		if (tangentBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshTangentList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshTangentList);
+		}
 
-		writeStartTag(pod::e_meshTangentList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshTangentList);
-
-		writeStartTag(pod::e_meshBinormalList, 0);
-		writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
-		offset += DataType::size(DataType::Float32) * 3;
-		writeEndTag(pod::e_meshBinormalList);
+		if (bitangentBuffer.size() > 0)
+		{
+			writeStartTag(pod::e_meshBinormalList, 0);
+			writeVertexAttributeOffset(m_fileStream, DataType::Float32, 3, stride, offset);
+			offset += DataType::size(DataType::Float32) * 3;
+			writeEndTag(pod::e_meshBinormalList);
+		}
 
 		if (uvBuffer.size() > 0)
 		{
@@ -586,8 +601,11 @@ void PODWriter::writeMeshBlock(uint index)
 
 		// Interleaved Data List
 		// Structure: position.xyz + normal.xyz + tangetn.xyz + UV.xy
-		uint32 stride = sizeof(positionBuffer[0]) + sizeof(normalBuffer[0]) + sizeof(tangentBuffer[0]) + sizeof(bitangentBuffer[0]);
+		uint32 stride = sizeof(positionBuffer[0]);
 
+		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
+		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
+		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
 		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
 		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
@@ -595,9 +613,15 @@ void PODWriter::writeMeshBlock(uint index)
 		for (uint i = 0; i < meshData.numVertices; ++i)
 		{
 			writeBytes(m_fileStream, positionBuffer[i]);
-			writeBytes(m_fileStream, normalBuffer[i]);
-			writeBytes(m_fileStream, tangentBuffer[i]);
-			writeBytes(m_fileStream, bitangentBuffer[i]);
+
+			if (normalBuffer.size() > 0)
+				writeBytes(m_fileStream, normalBuffer[i]);
+
+			if (tangentBuffer.size() > 0)
+				writeBytes(m_fileStream, tangentBuffer[i]);
+
+			if (bitangentBuffer.size() > 0)
+				writeBytes(m_fileStream, bitangentBuffer[i]);
 
 			if (uvBuffer.size() > 0)
 				writeBytes(m_fileStream, uvBuffer[i]);
