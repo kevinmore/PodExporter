@@ -454,6 +454,8 @@ void PODWriter::writeMeshBlock(uint index)
 		if (normalBuffer.size() > 0) stride += sizeof(normalBuffer[0]);
 		if (tangentBuffer.size() > 0) stride += sizeof(tangentBuffer[0]);
 		if (bitangentBuffer.size() > 0) stride += sizeof(bitangentBuffer[0]);
+		if (uvBuffer.size() > 0) stride += sizeof(uvBuffer[0]);
+		if (colorBuffer.size() > 0) stride += sizeof(colorBuffer[0]);
 
 		vector<char> interleavedDataList;
 		for (uint i = 0; i < meshData.numVertices; ++i)
