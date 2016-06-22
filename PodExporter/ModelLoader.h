@@ -144,6 +144,9 @@ private:
 
 	void applyPoseAtFrame(uint frameIndex);
 
+	string getEmbeddedTextureName(string& textureIndex);
+	string getEmbeddedTextureName(uint textureIndex);
+
 	/*
 	*	Clean up
 	*/

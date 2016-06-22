@@ -14,6 +14,3 @@ VEEMEE::ModelConverter::getInstance().ConvertToPOD("D:/model.fbx", PODWriter::Ba
 VEEMEE::ModelConverter::getInstance().ConvertToPOD("D:/model.fbx", PODWriter::ExportSkinningData); // this will export the basic mesh in the bind pose
 
 VEEMEE::ModelConverter::getInstance().ConvertToPOD("D:/model.fbx", PODWriter::ExportEverything); // this will export the model with the animation (currently not working)
-
-Issues need to fix:
-Skinning transformations matrixes are under work now.

@@ -1,5 +1,6 @@
 ﻿#include "ModelLoader.h"
 #include "AnimationHelper.h"
+#include <fstream>
 #include <sstream>
 #include <assimp/postprocess.h>
 
@@ -104,6 +105,61 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 
 	//parseExtraNodes(m_aiScene->mRootNode);
 	//collectExtraNodeAnimations();
+
+	// deal with the embedded textures
+	vector<string> texutreExtentions;
+	if (m_aiScene->HasTextures())
+	{
+		for (uint i = 0; i < m_aiScene->mNumTextures; ++i)
+		{
+			aiTexture* tex = m_aiScene->mTextures[i];
+			texutreExtentions.push_back(string(tex->achFormatHint));
+
+			bool isCompressed = tex->mHeight == 0;
+
+			// if the texture is compressed, (jpg, png...), the data is the raw file bytes
+			if (isCompressed)
+			{
+				fstream f = fstream(getEmbeddedTextureName(i) + "." + string(tex->achFormatHint), ios::binary | ios::out | ios::trunc);
+				if (f.is_open())
+				{
+					f.write(reinterpret_cast<const char *>(tex->pcData), tex->mWidth);
+					f.flush();
+					f.close();
+				}
+				else
+				{
+					cout << "\nCannot write out embedded texture";
+				}
+			}
+			else
+			{
+				// use free image to create an image
+				cout << "uncompressed embedded texture out put not implemented yet.";
+			}
+		}
+	}
+
+	// validate the texture files
+	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
+	{
+		TextureData texdata = m_modelDataVector[i]->materialData.textureData;
+		for (auto it = texdata.texturesMap.begin(); it != texdata.texturesMap.end(); ++it)
+		{
+			fstream textureFile(it->second);
+			// file does not exist
+			if (!textureFile.good())
+			{
+				// get the embedded texture index (in this case, the file name is always like *0, *1)
+				if (it->second[0] == '*')
+				{
+					string textureIndex = it->second.substr(1, it->second.length());
+					string textureName = getEmbeddedTextureName(textureIndex) + "." + texutreExtentions[stoi(textureIndex)];
+					it->second = textureName;
+				}
+			}
+		}
+	}
 
 	return m_modelDataVector;
 }
@@ -601,4 +657,31 @@ void ModelLoader::applyPoseAtFrame(uint frameIndex)
 			}
 		}
 	}
+}
+
+string ModelLoader::getEmbeddedTextureName(uint textureIndex)
+{
+	stringstream ss;
+	ss << textureIndex;
+
+	string nameWithoutExtension;
+	const size_t last_idx = m_fileName.rfind('.');
+	if (std::string::npos != last_idx)
+	{
+		nameWithoutExtension = m_fileName.substr(0, last_idx);
+	}
+
+	return nameWithoutExtension + "_EmbeddedTexture_" + ss.str() ;
+}
+
+string ModelLoader::getEmbeddedTextureName(string& textureIndex)
+{
+	string nameWithoutExtension;
+	const size_t last_idx = m_fileName.rfind('.');
+	if (std::string::npos != last_idx)
+	{
+		nameWithoutExtension = m_fileName.substr(0, last_idx);
+	}
+
+	return nameWithoutExtension + "_EmbeddedTexture_" + textureIndex;
 }
