@@ -175,3 +175,61 @@ void AnimationHelper::calcInterpolatedPosition(vec3& Out, float AnimationTime, c
 	Out = Start + Factor * Delta;
 }
 
+void AnimationHelper::reSampleAnimation(aiAnimation* pAnimation)
+{
+	uint numPositionKeys(0), numRotationKeys(0), numScalingKeys(0);
+	for (uint i = 0; i < pAnimation->mNumChannels; ++i)
+	{
+		numPositionKeys = std::max(numPositionKeys, pAnimation->mChannels[i]->mNumPositionKeys);
+		numRotationKeys = std::max(numRotationKeys, pAnimation->mChannels[i]->mNumRotationKeys);
+		numScalingKeys = std::max(numScalingKeys, pAnimation->mChannels[i]->mNumScalingKeys);
+	}
+
+	uint numKeyFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
+
+	// fill in the key frame time interval list
+	vector<double> intervalList;
+	for (uint i = 0; i < pAnimation->mNumChannels; ++i)
+	{
+		if (pAnimation->mChannels[i]->mNumPositionKeys == numKeyFrames)
+		{
+			for (uint j = 1; j < numKeyFrames; ++j)
+			{
+				intervalList.push_back(pAnimation->mChannels[i]->mPositionKeys[j].mTime - pAnimation->mChannels[i]->mPositionKeys[j - 1].mTime);
+			}
+			break;
+		}
+		else if (pAnimation->mChannels[i]->mNumRotationKeys == numKeyFrames)
+		{
+			for (uint j = 1; j < numKeyFrames; ++j)
+			{
+				intervalList.push_back(pAnimation->mChannels[i]->mRotationKeys[j].mTime - pAnimation->mChannels[i]->mRotationKeys[j - 1].mTime);
+			}
+			break;
+		}
+		else if (pAnimation->mChannels[i]->mNumScalingKeys == numKeyFrames)
+		{
+			for (uint j = 1; j < numKeyFrames; ++j)
+			{
+				intervalList.push_back(pAnimation->mChannels[i]->mScalingKeys[j].mTime - pAnimation->mChannels[i]->mScalingKeys[j - 1].mTime);
+			}
+			break;
+		}
+	}
+
+	// get the smallest frame time interval
+	m_frameIntervalInTicks = 1;
+	std::sort(intervalList.begin(), intervalList.end());
+	for (uint i = 0; i < intervalList.size(); ++i)
+	{
+		if (intervalList[i] != 0)
+		{
+			m_frameIntervalInTicks = intervalList[i];
+			break;
+		}
+	}
+
+	// calculate the exact number of frames
+	m_numFrames = uint (pAnimation->mDuration / m_frameIntervalInTicks) + 1;
+}
+

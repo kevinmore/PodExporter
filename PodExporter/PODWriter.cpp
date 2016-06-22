@@ -312,60 +312,16 @@ void PODWriter::writeSceneBlock()
 	if (m_exportAnimations)
 	{
 		aiAnimation* animation = m_modelLoader.getScene()->mAnimations[0];
-		uint32 numPositionKeys(0), numRotationKeys(0), numScalingKeys(0);
-		for (uint i = 0; i < animation->mNumChannels; ++i)
-		{
-			numPositionKeys = std::max(numPositionKeys, animation->mChannels[i]->mNumPositionKeys);
-			numRotationKeys = std::max(numRotationKeys, animation->mChannels[i]->mNumRotationKeys);
-			numScalingKeys = std::max(numScalingKeys, animation->mChannels[i]->mNumScalingKeys);
-		}
-		m_numFrames = std::max(std::max(numPositionKeys, numRotationKeys), numScalingKeys);
 
-		// fill in the key frame time list
-		for (uint i = 0; i < animation->mNumChannels; ++i)
-		{
-			if (animation->mChannels[i]->mNumPositionKeys == m_numFrames)
-			{
-				for (uint j = 0; j < m_numFrames; ++j)
-				{
-					m_animationKeyFrameTimeList.push_back((float)animation->mChannels[i]->mPositionKeys[j].mTime);
-				}
-				break;
-			}
-
-			if (animation->mChannels[i]->mNumRotationKeys == m_numFrames)
-			{
-				for (uint j = 0; j < m_numFrames; ++j)
-				{
-					m_animationKeyFrameTimeList.push_back((float)animation->mChannels[i]->mRotationKeys[j].mTime);
-				}
-				break;
-			}
-
-			if (animation->mChannels[i]->mNumScalingKeys == m_numFrames)
-			{
-				for (uint j = 0; j < m_numFrames; ++j)
-				{
-					m_animationKeyFrameTimeList.push_back((float)animation->mChannels[i]->mScalingKeys[j].mTime);
-				}
-				break;
-			}
-		}
+		m_animationHelper.reSampleAnimation(animation);
 
 		// Num. Frames
 		writeStartTag(pod::e_sceneNumFrames, 4);
-		write4Bytes(m_fileStream, m_numFrames);
+		write4Bytes(m_fileStream, m_animationHelper.getNumFrames());
 		writeEndTag(pod::e_sceneNumFrames);
 
 		// FPS (30 fps by default)
-		uint32 fps = m_numFrames / static_cast<uint32>(animation->mDuration);
-
-		//special case
-		if (fps < 10)
-		{
-			fps = animation->mTicksPerSecond != 0 ? uint32(animation->mTicksPerSecond) : 30;
-		}
-
+		uint32 fps = 30;
 		writeStartTag(pod::e_sceneFPS, 4);
 		write4Bytes(m_fileStream, fps);
 		writeEndTag(pod::e_sceneFPS);
@@ -738,23 +694,23 @@ void PODWriter::writeNodeBlock(uint index)
 	}
 
 	// Node Animation
-	AnimationHelper helper;
 	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
-	aiNodeAnim* animation = helper.findNodeAnim(anim, node->mName);
+	aiNodeAnim* animation = m_animationHelper.findNodeAnim(anim, node->mName);
 
 	vector<mat4> nodeTransformations;
 	if (animation)
 	{
 		// Re-sampling the animation
-		for (uint i = 0; i < m_numFrames; ++i)
+		float frameInterval = (float)m_animationHelper.getFrameIntervalInTicks();
+		for (uint i = 0; i < m_animationHelper.getNumFrames(); ++i)
 		{
 			vec3 pos, scaling;
 			quat rot;
 
-			float frameTime = m_animationKeyFrameTimeList[i];
-			helper.calcInterpolatedPosition(pos, frameTime, animation);
-			helper.calcInterpolatedRotation(rot, frameTime, animation);
-			helper.calcInterpolatedScaling(scaling, frameTime, animation);
+			float frameTime = i * frameInterval;
+			m_animationHelper.calcInterpolatedPosition(pos, frameTime, animation);
+			m_animationHelper.calcInterpolatedRotation(rot, frameTime, animation);
+			m_animationHelper.calcInterpolatedScaling(scaling, frameTime, animation);
 
 			nodeTransformations.push_back(mat4(scaling, rot, pos));
 		}

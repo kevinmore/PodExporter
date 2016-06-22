@@ -1,6 +1,7 @@
 #pragma once
 #include "ModelLoader.h"
 #include "PODDefines.h"
+#include "AnimationHelper.h"
 #include <fstream>
 using std::vector;
 
@@ -35,13 +36,13 @@ private:
 	void writeTextureBlock(uint index);
 
 	ModelLoader m_modelLoader;
+	AnimationHelper m_animationHelper;
 	vector<ModelDataPtr> m_modelDataVec;
 	vector<aiNode*> m_Nodes;
 	vector<float> m_animationKeyFrameTimeList;
 	bool m_exportSkinningData;
 	bool m_exportAnimations;
 	ExportOptions m_exportOptions;
-	uint32 m_numFrames;
 	fstream m_fileStream;
 };
 
