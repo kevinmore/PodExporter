@@ -61,6 +61,9 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		return empty;
 	}
 
+	// deal with the embedded textures
+	extractEmbeddedTextures();
+
 	//displaySceneGraph(m_aiScene->mRootNode);
 
 	m_GlobalInverseTransform = m_aiScene->mRootNode->mTransformation;
@@ -86,6 +89,9 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		m_Nodes.push_back(meshNode);
 	}
 
+	parseLightNodes();
+	parseCameraNodes();
+
 	// parse other nodes, this step makes sure the mesh nodes are in the front
 	parseNoneMeshNodes(m_aiScene->mRootNode);
 
@@ -106,60 +112,6 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 	//parseExtraNodes(m_aiScene->mRootNode);
 	//collectExtraNodeAnimations();
 
-	// deal with the embedded textures
-	vector<string> texutreExtentions;
-	if (m_aiScene->HasTextures())
-	{
-		for (uint i = 0; i < m_aiScene->mNumTextures; ++i)
-		{
-			aiTexture* tex = m_aiScene->mTextures[i];
-			texutreExtentions.push_back(string(tex->achFormatHint));
-
-			bool isCompressed = tex->mHeight == 0;
-
-			// if the texture is compressed, (jpg, png...), the data is the raw file bytes
-			if (isCompressed)
-			{
-				fstream f = fstream(getEmbeddedTextureName(i) + "." + string(tex->achFormatHint), ios::binary | ios::out | ios::trunc);
-				if (f.is_open())
-				{
-					f.write(reinterpret_cast<const char *>(tex->pcData), tex->mWidth);
-					f.flush();
-					f.close();
-				}
-				else
-				{
-					cout << "\nCannot write out embedded texture";
-				}
-			}
-			else
-			{
-				// use free image to create an image
-				cout << "uncompressed embedded texture out put not implemented yet.";
-			}
-		}
-	}
-
-	// validate the texture files
-	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
-	{
-		TextureData texdata = m_modelDataVector[i]->materialData.textureData;
-		for (auto it = texdata.texturesMap.begin(); it != texdata.texturesMap.end(); ++it)
-		{
-			fstream textureFile(it->second);
-			// file does not exist
-			if (!textureFile.good())
-			{
-				// get the embedded texture index (in this case, the file name is always like *0, *1)
-				if (it->second[0] == '*')
-				{
-					string textureIndex = it->second.substr(1, it->second.length());
-					string textureName = getEmbeddedTextureName(textureIndex) + "." + texutreExtentions[stoi(textureIndex)];
-					it->second = textureName;
-				}
-			}
-		}
-	}
 
 	return m_modelDataVector;
 }
@@ -439,7 +391,6 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	if (material->GetTextureCount(aiTextureType_REFLECTION)) textureTypes.push_back(aiTextureType_REFLECTION);
 	//if (material->GetTextureCount(aiTextureType_DISPLACEMENT)) textureTypes.push_back(aiTextureType_DISPLACEMENT);
 	//if (material->GetTextureCount(aiTextureType_LIGHTMAP)) textureTypes.push_back(aiTextureType_LIGHTMAP);
-	//if(material->GetTextureCount(aiTextureType_UNKNOWN)     ) textureFeatures .push_back( aiTextureType_UNKNOWN);
 
 	for each(aiTextureType type in textureTypes)
 	{
@@ -447,11 +398,17 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 		{
 			if (strlen(path.data) == 0) continue;
 
+			// validate if the texture file exist
+			string texturePath = path.data;
+			fstream f(texturePath);
+			if ((!f.good() || m_embeddedTexutreNames.size() > 0) && texturePath[0] == '*')
+			{
+				string textureIndex = texturePath.substr(1, texturePath.length());
+				texturePath = m_embeddedTexutreNames[stoi(textureIndex)];
+			}
+
 			// absolute path
 			//string texturePath = directory + "/" + path.data;
-
-			// relative path
-			string texturePath = path.data;
 
 			data.texturesMap[type] = texturePath;
 			m_texturePaths.push_back(texturePath);
@@ -466,7 +423,6 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 	if (!pNode) return;
 
 	// if the node is a child of the scene root, not a mesh node, and does not have any children, remove it
-	// e.g. light, camera, unnamed useless nodes, etc
 	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
   	
 	// if it's the root node, check if it holds an identity transformation matrix
@@ -478,13 +434,52 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 	// ignore the node with 0 or multiple meshes
 	if (!isUselessNode && pNode->mNumMeshes != 1)
 	{
-		//if(!isExtraNode(pNode))
+		if(std::find(m_Nodes.begin(), m_Nodes.end(), pNode) == m_Nodes.end())
 			m_Nodes.push_back(pNode);
 	}
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
 		parseNoneMeshNodes(pNode->mChildren[i], i);
+	}
+}
+
+void ModelLoader::parseLightNodes()
+{
+	if (m_aiScene->HasLights())
+	{
+		for (uint i = 0; i < m_aiScene->mNumLights; ++i)
+		{
+			aiLight* pLight = m_aiScene->mLights[i];
+
+			// skip the ambient light, because pod does not support it
+			// store it as the scene ambient color
+			if (pLight->mType == aiLightSource_AMBIENT)
+			{
+				m_sceneAmbientColor = pLight->mColorAmbient;
+			}
+			else if(pLight->mType == aiLightSource_POINT || pLight->mType == aiLightSource_DIRECTIONAL || pLight->mType == aiLightSource_SPOT)
+			{
+				// get the node
+				aiNode* pLightNode = m_aiScene->mRootNode->FindNode(pLight->mName);
+				m_Nodes.push_back(pLightNode);
+			}
+		}
+	}
+}
+
+void ModelLoader::parseCameraNodes()
+{
+	if (m_aiScene->HasCameras())
+	{
+		for (uint i = 0; i < m_aiScene->mNumCameras; ++i)
+		{
+			aiCamera* pCamera = m_aiScene->mCameras[i];
+
+			// get the node
+			aiNode* pCameraNode = m_aiScene->mRootNode->FindNode(pCamera->mName);
+			m_Nodes.push_back(pCameraNode);
+		}
 	}
 }
 
@@ -684,4 +679,40 @@ string ModelLoader::getEmbeddedTextureName(string& textureIndex)
 	}
 
 	return nameWithoutExtension + "_EmbeddedTexture_" + textureIndex;
+}
+
+void ModelLoader::extractEmbeddedTextures()
+{
+	if (m_aiScene->HasTextures())
+	{
+		for (uint i = 0; i < m_aiScene->mNumTextures; ++i)
+		{
+			aiTexture* tex = m_aiScene->mTextures[i];
+
+			bool isCompressed = tex->mHeight == 0;
+
+			// if the texture is compressed, (jpg, png...), the data is the raw file bytes
+			if (isCompressed)
+			{
+				string textureName = getEmbeddedTextureName(i) + "." + string(tex->achFormatHint);
+				m_embeddedTexutreNames.push_back(textureName);
+				fstream f = fstream(textureName, ios::binary | ios::out | ios::trunc);
+				if (f.is_open())
+				{
+					f.write(reinterpret_cast<const char *>(tex->pcData), tex->mWidth);
+					f.flush();
+					f.close();
+				}
+				else
+				{
+					cout << "\nCannot write out embedded texture";
+				}
+			}
+			else
+			{
+				// use free image to create an image
+				cout << "uncompressed embedded texture out put not implemented yet.";
+			}
+		}
+	}
 }

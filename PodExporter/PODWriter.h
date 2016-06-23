@@ -34,6 +34,8 @@ private:
 	void writeMeshBlock(uint index);
 	void writeNodeBlock(uint index);
 	void writeTextureBlock(uint index);
+	void writeLightBlock(uint index);
+	void writeCameraBlock(uint index);
 
 	ModelLoader m_modelLoader;
 	AnimationHelper m_animationHelper;

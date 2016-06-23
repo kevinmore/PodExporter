@@ -43,6 +43,12 @@ typedef aiColor4D color4D;
 	}                               \
 }
 
+template <typename T> 
+T CLAMP(const T& value, const T& low, const T& high)
+{
+	return value < low ? low : (value > high ? high : value);
+}
+
 namespace 
 {
 	glm::mat4 toGLMMatrix4x4(aiMatrix4x4& m)

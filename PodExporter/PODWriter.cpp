@@ -10,7 +10,7 @@ to '\r\n', which produces one more byte than expected.                  */
 #include <cstdio>
 #include <algorithm>
 
-#define  MAX_NUM_BONES_PER_BATCH 8
+#define  MAX_NUM_BONES_PER_BATCH 9
 #define HISTORY_MESSAGE "Hello POD!" // Put your messages here...
 
 namespace { // LOCAL FUNCTIONS
@@ -273,11 +273,38 @@ void PODWriter::writeEndTag(uint32 identifier)
 
 void PODWriter::writeSceneBlock()
 {
+	const aiScene* scene = m_modelLoader.getScene();
+
 	// Clear Color
 	float clearColor[3] = {0.68f, 0.68f, 0.68f};
 	writeStartTag(pod::e_sceneClearColor, 3 * 4);
 	write4ByteArray(m_fileStream, clearColor, 3);
 	writeEndTag(pod::e_sceneClearColor);
+
+	// Ambient Color
+	writeStartTag(pod::e_sceneAmbientColor, 3 * 4);
+	write4ByteArray(m_fileStream, &m_modelLoader.getSceneAmbientColor()[0], 3);
+	writeEndTag(pod::e_sceneAmbientColor);
+
+	// Num. Cameras
+// 	uint32 numCameras = scene->mNumCameras;
+// 	writeStartTag(pod::e_sceneNumCameras, 4);
+// 	write4Bytes(m_fileStream, numCameras);
+// 	writeEndTag(pod::e_sceneNumCameras);
+
+	// Num. Lights
+	uint32 numLights = 0;
+	for (uint i = 0; i < scene->mNumLights; ++i)
+	{
+		aiLight* pLight = scene->mLights[i];
+		if (pLight->mType == aiLightSource_POINT || pLight->mType == aiLightSource_DIRECTIONAL || pLight->mType == aiLightSource_SPOT)
+		{
+			++numLights;
+		}
+	}
+	writeStartTag(pod::e_sceneNumLights, 4);
+	write4Bytes(m_fileStream, numLights);
+	writeEndTag(pod::e_sceneNumLights);
 
 	// Num. Meshes
 	uint32 numMeshes = m_modelDataVec.size();
@@ -286,7 +313,7 @@ void PODWriter::writeSceneBlock()
 	writeEndTag(pod::e_sceneNumMeshes);
 
 	// Num. Nodes
-	uint32 numNodes = m_modelLoader.getNumNodes();
+	uint32 numNodes = m_Nodes.size();
 	writeStartTag(pod::e_sceneNumNodes, 4);
 	write4Bytes(m_fileStream, numNodes);
 	writeEndTag(pod::e_sceneNumNodes);
@@ -311,7 +338,7 @@ void PODWriter::writeSceneBlock()
 
 	if (m_exportAnimations)
 	{
-		aiAnimation* animation = m_modelLoader.getScene()->mAnimations[0];
+		aiAnimation* animation = scene->mAnimations[0];
 
 		m_animationHelper.reSampleAnimation(animation);
 
@@ -327,12 +354,41 @@ void PODWriter::writeSceneBlock()
 		writeEndTag(pod::e_sceneFPS);
 	}
 
+	// Camera Block
+// 	for (uint i = 0; i < numCameras; ++i)
+// 	{
+// 		writeCameraBlock(i);
+// 	}
+// 	cout << "\nExported Cameras." << endl;
+
+	// Light Block
+	for (uint i = 0; i < numLights; ++i)
+	{
+		writeLightBlock(i);
+	}
+	cout << "\nExported Lights." << endl;
+
 	// Material Block
 	for (uint i = 0; i < m_modelDataVec.size(); ++i)
 	{
 		writeMaterialBlock(i);
 	}
-	cout << "\nExported Materials..." << endl;
+	cout << "\nExported Materials." << endl;
+
+	// Mesh Block
+	for (uint i = 0; i < m_modelDataVec.size(); ++i)
+	{
+		writeMeshBlock(i);
+	}
+	cout << "\nExported Meshes." << endl;
+
+	// Node Block
+	cout << "\nExporting Nodes..." << endl;
+	for (uint32 i = 0; i < numNodes; ++i)
+	{
+		writeNodeBlock(i);
+	}
+	cout << "\n\nExported Nodes." << endl;
 
 	// Texture Block
 	for (uint32 i = 0; i < numTextures; ++i)
@@ -340,22 +396,6 @@ void PODWriter::writeSceneBlock()
 		writeTextureBlock(i);
 	}
 	cout << "\nExported Textures..." << endl;
-
-	// Mesh Block
-	for (uint i = 0; i < m_modelDataVec.size(); ++i)
-	{
-		writeMeshBlock(i);
-	}
-	cout << "\nExported Meshes..." << endl;
-
-	// Node Block
-	cout << "\n\nExporting Nodes..." << endl;
-
-	for (uint32 i = 0; i < numNodes; ++i)
-	{
-		writeNodeBlock(i);
-	}
-	cout << "\n\nExported Nodes..." << endl;
 
 	cout << "\n\nDone Exporting." << endl;
 }
@@ -673,32 +713,22 @@ void PODWriter::writeNodeBlock(uint index)
 
 	// Parent Index 
 	int32 parentIdx = -1;
-	for (uint32 i = 0; i < m_Nodes.size(); ++i)
+	if (node->mParent)
 	{
-		if (m_Nodes[i] == node->mParent)
-		{
-			parentIdx = i;
-			break;
-		}
+		auto it = std::find(m_Nodes.begin(), m_Nodes.end(), node->mParent);
+		parentIdx = std::distance(m_Nodes.begin(), it);
 	}
 
 	writeStartTag(pod::e_nodeParentIndex, 4);
 	write4Bytes(m_fileStream, parentIdx);
 	writeEndTag(pod::e_nodeParentIndex);
 
-	// early exit if animation exporting is not required
-	if (!m_exportAnimations)
-	{
-		writeEndTag(pod::e_sceneNode);
-		return;
-	}
-
 	// Node Animation
 	aiAnimation* anim = m_modelLoader.getScene()->mAnimations[0];
 	aiNodeAnim* animation = m_animationHelper.findNodeAnim(anim, node->mName);
 
 	vector<mat4> nodeTransformations;
-	if (animation)
+	if (m_exportAnimations && animation)
 	{
 		// Re-sampling the animation
 		float frameInterval = (float)m_animationHelper.getFrameIntervalInTicks();
@@ -971,6 +1001,129 @@ void PODWriter::writeTextureBlock(uint index)
 	writeEndTag(pod::e_textureFilename);
 
 	writeEndTag(pod::e_sceneTexture);
+}
+
+void PODWriter::writeLightBlock(uint index)
+{
+	// write light block
+	writeStartTag(pod::e_sceneLight, 0);
+
+	aiLight* light = m_modelLoader.getScene()->mLights[index];
+	aiNode* lightNode = m_modelLoader.getScene()->mRootNode->FindNode(light->mName);
+
+	// find the index of the target node in the node list
+	aiNode* targetNode = m_modelLoader.getScene()->mRootNode->FindNode((std::string(light->mName.C_Str()) + ".Target").c_str());
+	int32 targetObjIndex = -1;
+	if (targetNode)
+	{
+		auto it = std::find(m_Nodes.begin(), m_Nodes.end(), targetNode);
+		targetObjIndex = std::distance(m_Nodes.begin(), it);
+	}
+
+	writeStartTag(pod::e_lightTargetObjectIndex, 4);
+	write4Bytes(m_fileStream, targetObjIndex);
+	writeEndTag(pod::e_lightTargetObjectIndex);
+
+	// light color (RGB, 3 floats)
+	// TODO: Do we need to clamp it?
+	float lightColor[3] = { CLAMP(light->mColorDiffuse.r / 256.0f, 0.0f, 1.0f), 
+		CLAMP(light->mColorDiffuse.g / 256.0f, 0.0f, 1.0f),
+		CLAMP(light->mColorDiffuse.b / 256.0f, 0.0f, 1.0f) };
+
+	writeStartTag(pod::e_lightColor, 3 * 4);
+	write4ByteArray(m_fileStream, lightColor, 3);
+	writeEndTag(pod::e_lightColor);
+
+	// light type (point = 0, directional = 1, spot = 2)
+	uint32 lightType;
+	switch (light->mType)
+	{
+	case aiLightSource_POINT:
+		lightType = 0;
+		break;
+	case aiLightSource_DIRECTIONAL:
+		lightType = 1;
+		break;
+	case aiLightSource_SPOT:
+		lightType = 2;
+		break;
+	default:
+		lightType = 0;
+		break;
+	}
+	writeStartTag(pod::e_lightType, 4);
+	write4Bytes(m_fileStream, lightType);
+	writeEndTag(pod::e_lightType);
+
+	// constant attenuation
+	writeStartTag(pod::e_lightConstantAttenuation, 4);
+	write4Bytes(m_fileStream, light->mAttenuationConstant);
+	writeEndTag(pod::e_lightConstantAttenuation);
+
+	// linear attenuation
+	writeStartTag(pod::e_lightLinearAttenuation, 4);
+	write4Bytes(m_fileStream, light->mAttenuationLinear);
+	writeEndTag(pod::e_lightLinearAttenuation);
+
+	// quadratic attenuation
+	writeStartTag(pod::e_lightQuadraticAttenuation, 4);
+	write4Bytes(m_fileStream, light->mAttenuationQuadratic);
+	writeEndTag(pod::e_lightQuadraticAttenuation);
+
+	if (light->mType == aiLightSource_SPOT)
+	{
+		// falloff angle
+		writeStartTag(pod::e_lightFalloffAngle, 4);
+		write4Bytes(m_fileStream, light->mAngleOuterCone);
+		writeEndTag(pod::e_lightFalloffAngle);
+
+		// falloff exponent
+		float falloffExponent = 0.0f;
+		writeStartTag(pod::e_lightFalloffExponent, 4);
+		write4Bytes(m_fileStream, falloffExponent);
+		writeEndTag(pod::e_lightFalloffExponent);
+	}
+	
+	writeEndTag(pod::e_sceneLight);
+}
+
+void PODWriter::writeCameraBlock(uint index)
+{
+	// write camera block
+	writeStartTag(pod::e_sceneCamera, 0);
+
+	aiCamera* camera = m_modelLoader.getScene()->mCameras[index];
+	aiNode* cameraNode = m_modelLoader.getScene()->mRootNode->FindNode(camera->mName);
+
+	// find the index of the target node in the node list
+	aiNode* targetNode = m_modelLoader.getScene()->mRootNode->FindNode((std::string(camera->mName.C_Str()) + ".Target").c_str());
+	int32 targetObjIndex = -1;
+	if (targetNode)
+	{
+		auto it = std::find(m_Nodes.begin(), m_Nodes.end(), targetNode);
+		targetObjIndex = std::distance(m_Nodes.begin(), it);
+	}
+
+	writeStartTag(pod::e_cameraTargetObjectIndex, 4);
+	write4Bytes(m_fileStream, targetObjIndex);
+	writeEndTag(pod::e_lightTargetObjectIndex);
+
+	// FOV
+	writeStartTag(pod::e_cameraFOV, 4);
+	write4Bytes(m_fileStream, camera->mHorizontalFOV);
+	writeEndTag(pod::e_cameraFOV);
+
+	// far clip
+	writeStartTag(pod::e_cameraFarPlane, 4);
+	write4Bytes(m_fileStream, camera->mClipPlaneFar);
+	writeEndTag(pod::e_cameraFarPlane);
+
+	// near clip
+	writeStartTag(pod::e_cameraNearPlane, 4);
+	write4Bytes(m_fileStream, camera->mClipPlaneNear);
+	writeEndTag(pod::e_cameraNearPlane);
+
+	writeEndTag(pod::e_sceneCamera);
 }
 
 }

@@ -110,7 +110,6 @@ public:
 
 	string& getFileNmae() { return m_fileName; }
 	vector<aiNode*>& getNodeList() { return m_Nodes; }
-	uint getNumNodes() { return m_Nodes.size();  }
 	uint getNumTextures() { return m_texturePaths.size(); }
 	const aiScene* getScene() { return m_aiScene; }
 	string& getTexture(uint index) { return m_texturePaths[index]; }
@@ -120,6 +119,7 @@ public:
 	bool isExtraNode(aiNode* pNode);
 	bool isExtraNode(string& nodeName);
 	aiNode* getTrueParentNode(aiNode* pNode);
+	color3D& getSceneAmbientColor() { return m_sceneAmbientColor; }
 
 private:
 	/*
@@ -132,6 +132,8 @@ private:
 	void readVertexAttributes(unsigned int index, const aiMesh* mesh, MeshData& data);
 	string getMeshNameFromNode(unsigned int meshIndex, aiNode* pNode);
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
+	void parseLightNodes();
+	void parseCameraNodes();
 	void parseNoneMeshNodes(aiNode* pNode, uint index = 0);
 	void parseExtraNodes(aiNode* pNode);
 	mat4 calculateGlobalTransform(aiNode* pNode);
@@ -147,6 +149,8 @@ private:
 	string getEmbeddedTextureName(string& textureIndex);
 	string getEmbeddedTextureName(uint textureIndex);
 
+	void extractEmbeddedTextures();
+
 	/*
 	*	Clean up
 	*/
@@ -159,6 +163,7 @@ private:
 	// make the importer as member valuable, so that it does not call FreeScene until the class is destructed
 	Assimp::Importer m_importer;
 	const aiScene* m_aiScene;
+	color3D m_sceneAmbientColor;
 	mat4 m_GlobalInverseTransform;
 	vector<ModelDataPtr> m_modelDataVector;
 	map<string, unsigned short> m_BoneMapping; // maps a bone name to its index
@@ -166,6 +171,7 @@ private:
 	map<string, aiNodeAnim*> m_extraNodeAnimation; // maps an extra node to its animation
 	vector<aiNode*> m_Nodes;
 	vector<aiNode*> m_subMeshNodes;
+	vector<string> m_embeddedTexutreNames;
 	vector<string> m_texturePaths;
 	vector<aiNode*> m_parsedExtraNodes;
 };
