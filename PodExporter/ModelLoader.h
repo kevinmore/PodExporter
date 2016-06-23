@@ -134,7 +134,7 @@ private:
 	aiNode* getNode(const char* meshName, vector<aiNode*>& source);
 	void parseLightNodes();
 	void parseCameraNodes();
-	void parseNoneMeshNodes(aiNode* pNode, uint index = 0);
+	void parseOtherNodes(aiNode* pNode, uint index = 0);
 	void parseExtraNodes(aiNode* pNode);
 	mat4 calculateGlobalTransform(aiNode* pNode);
 

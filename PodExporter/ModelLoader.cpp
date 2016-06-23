@@ -89,11 +89,11 @@ vector<ModelDataPtr> ModelLoader::loadModel(const string& fileName, LoadingQuali
 		m_Nodes.push_back(meshNode);
 	}
 
-	parseLightNodes();
+ 	parseLightNodes();
 	parseCameraNodes();
 
 	// parse other nodes, this step makes sure the mesh nodes are in the front
-	parseNoneMeshNodes(m_aiScene->mRootNode);
+	parseOtherNodes(m_aiScene->mRootNode);
 
 	// load bones
 	for (uint i = 0; i < m_aiScene->mNumMeshes; ++i)
@@ -418,14 +418,12 @@ TextureData ModelLoader::loadTexture(const aiMaterial* material)
 	return data;
 }
 
-void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
+void ModelLoader::parseOtherNodes(aiNode* pNode, uint index/* = 0*/)
 {
 	if (!pNode) return;
 
-	// if the node is a child of the scene root, not a mesh node, and does not have any children, remove it
-	bool isUselessNode = (pNode->mParent == m_aiScene->mRootNode && pNode->mNumMeshes == 0 && pNode->mNumChildren == 0);
-  	
 	// if it's the root node, check if it holds an identity transformation matrix
+	bool isUselessNode = false;
 	if (pNode == m_aiScene->mRootNode && pNode->mTransformation.IsIdentity())
 	{
 		isUselessNode = true;
@@ -440,7 +438,7 @@ void ModelLoader::parseNoneMeshNodes(aiNode* pNode, uint index/* = 0*/)
 
 	for (size_t i = 0; i < pNode->mNumChildren; ++i)
 	{
-		parseNoneMeshNodes(pNode->mChildren[i], i);
+		parseOtherNodes(pNode->mChildren[i], i);
 	}
 }
 

@@ -10,7 +10,7 @@ to '\r\n', which produces one more byte than expected.                  */
 #include <cstdio>
 #include <algorithm>
 
-#define  MAX_NUM_BONES_PER_BATCH 9
+#define  MAX_NUM_BONES_PER_BATCH 8
 #define HISTORY_MESSAGE "Hello POD!" // Put your messages here...
 
 namespace { // LOCAL FUNCTIONS
@@ -282,15 +282,22 @@ void PODWriter::writeSceneBlock()
 	writeEndTag(pod::e_sceneClearColor);
 
 	// Ambient Color
-	writeStartTag(pod::e_sceneAmbientColor, 3 * 4);
-	write4ByteArray(m_fileStream, &m_modelLoader.getSceneAmbientColor()[0], 3);
-	writeEndTag(pod::e_sceneAmbientColor);
+ 	writeStartTag(pod::e_sceneAmbientColor, 3 * 4);
+ 	write4ByteArray(m_fileStream, &m_modelLoader.getSceneAmbientColor()[0], 3);
+ 	writeEndTag(pod::e_sceneAmbientColor);
 
 	// Num. Cameras
-// 	uint32 numCameras = scene->mNumCameras;
-// 	writeStartTag(pod::e_sceneNumCameras, 4);
-// 	write4Bytes(m_fileStream, numCameras);
-// 	writeEndTag(pod::e_sceneNumCameras);
+	uint32 numCameras = scene->mNumCameras;
+	writeStartTag(pod::e_sceneNumCameras, 4);
+	write4Bytes(m_fileStream, numCameras);
+	writeEndTag(pod::e_sceneNumCameras);
+
+	// Camera Block
+	for (uint i = 0; i < numCameras; ++i)
+	{
+		writeCameraBlock(i);
+	}
+  	cout << "\nExported Cameras." << endl;
 
 	// Num. Lights
 	uint32 numLights = 0;
@@ -305,6 +312,13 @@ void PODWriter::writeSceneBlock()
 	writeStartTag(pod::e_sceneNumLights, 4);
 	write4Bytes(m_fileStream, numLights);
 	writeEndTag(pod::e_sceneNumLights);
+
+	// Light Block
+	for (uint i = 0; i < numLights; ++i)
+	{
+		writeLightBlock(i);
+	}
+ 	cout << "\nExported Lights." << endl;
 
 	// Num. Meshes
 	uint32 numMeshes = m_modelDataVec.size();
@@ -353,20 +367,6 @@ void PODWriter::writeSceneBlock()
 		write4Bytes(m_fileStream, fps);
 		writeEndTag(pod::e_sceneFPS);
 	}
-
-	// Camera Block
-// 	for (uint i = 0; i < numCameras; ++i)
-// 	{
-// 		writeCameraBlock(i);
-// 	}
-// 	cout << "\nExported Cameras." << endl;
-
-	// Light Block
-	for (uint i = 0; i < numLights; ++i)
-	{
-		writeLightBlock(i);
-	}
-	cout << "\nExported Lights." << endl;
 
 	// Material Block
 	for (uint i = 0; i < m_modelDataVec.size(); ++i)
@@ -713,11 +713,14 @@ void PODWriter::writeNodeBlock(uint index)
 
 	// Parent Index 
 	int32 parentIdx = -1;
-	if (node->mParent)
+	for (uint i = 0; i < m_Nodes.size(); ++i)
 	{
-		auto it = std::find(m_Nodes.begin(), m_Nodes.end(), node->mParent);
-		parentIdx = std::distance(m_Nodes.begin(), it);
-	}
+		if (m_Nodes[i] == node->mParent)
+		{
+			parentIdx = i;
+			break;
+		}
+ 	}
 
 	writeStartTag(pod::e_nodeParentIndex, 4);
 	write4Bytes(m_fileStream, parentIdx);
@@ -1012,12 +1015,21 @@ void PODWriter::writeLightBlock(uint index)
 	aiNode* lightNode = m_modelLoader.getScene()->mRootNode->FindNode(light->mName);
 
 	// find the index of the target node in the node list
-	aiNode* targetNode = m_modelLoader.getScene()->mRootNode->FindNode((std::string(light->mName.C_Str()) + ".Target").c_str());
 	int32 targetObjIndex = -1;
-	if (targetNode)
+	if (light->mType == aiLightSource_SPOT)
 	{
-		auto it = std::find(m_Nodes.begin(), m_Nodes.end(), targetNode);
-		targetObjIndex = std::distance(m_Nodes.begin(), it);
+		aiNode* targetNode = m_modelLoader.getScene()->mRootNode->FindNode((std::string(light->mName.C_Str()) + ".Target").c_str());
+		if (targetNode)
+		{
+			for (uint i = 0; i < m_Nodes.size(); ++i)
+			{
+				if (m_Nodes[i] == targetNode)
+				{
+					targetObjIndex = i;
+					break;
+				}
+			}
+		}
 	}
 
 	writeStartTag(pod::e_lightTargetObjectIndex, 4);
@@ -1097,30 +1109,51 @@ void PODWriter::writeCameraBlock(uint index)
 
 	// find the index of the target node in the node list
 	aiNode* targetNode = m_modelLoader.getScene()->mRootNode->FindNode((std::string(camera->mName.C_Str()) + ".Target").c_str());
-	int32 targetObjIndex = -1;
+	int32 targetObjIndex = 2;
 	if (targetNode)
 	{
-		auto it = std::find(m_Nodes.begin(), m_Nodes.end(), targetNode);
-		targetObjIndex = std::distance(m_Nodes.begin(), it);
+		for (uint i = 0; i < m_Nodes.size(); ++i)
+		{
+			if (m_Nodes[i] == targetNode)
+			{
+				targetObjIndex = i;
+				break;
+			}
+		}
 	}
+// 	else
+// 	{
+// 		// create a dummy node as the loot at target
+// 		targetNode = new aiNode(std::string(camera->mName.C_Str()) + ".Target");
+// 		targetNode->mParent = cameraNode;
+// 		targetNode->mTransformation = mat4(vec3(1, 1, 1), quat(), camera->mLookAt);
+// 		targetObjIndex = m_Nodes.size();
+// 		m_Nodes.push_back(targetNode);
+// 	}
 
 	writeStartTag(pod::e_cameraTargetObjectIndex, 4);
 	write4Bytes(m_fileStream, targetObjIndex);
-	writeEndTag(pod::e_lightTargetObjectIndex);
-
+	writeEndTag(pod::e_cameraTargetObjectIndex);
+	
 	// FOV
+	float fov = 0.785398185f;
 	writeStartTag(pod::e_cameraFOV, 4);
-	write4Bytes(m_fileStream, camera->mHorizontalFOV);
+	//write4Bytes(m_fileStream, camera->mHorizontalFOV);
+	write4Bytes(m_fileStream, fov);
 	writeEndTag(pod::e_cameraFOV);
 
 	// far clip
+	float farc = 1000.0f;
 	writeStartTag(pod::e_cameraFarPlane, 4);
-	write4Bytes(m_fileStream, camera->mClipPlaneFar);
+	//write4Bytes(m_fileStream, camera->mClipPlaneFar);
+	write4Bytes(m_fileStream, farc);
 	writeEndTag(pod::e_cameraFarPlane);
 
 	// near clip
+	float nearc = 1.0f;
 	writeStartTag(pod::e_cameraNearPlane, 4);
-	write4Bytes(m_fileStream, camera->mClipPlaneNear);
+	//write4Bytes(m_fileStream, camera->mClipPlaneNear);
+	write4Bytes(m_fileStream, nearc);
 	writeEndTag(pod::e_cameraNearPlane);
 
 	writeEndTag(pod::e_sceneCamera);
