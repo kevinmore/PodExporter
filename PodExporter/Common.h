@@ -62,10 +62,10 @@ namespace
 
 	aiMatrix4x4 toAssimpMatrix4x4(glm::mat4& m)
 	{
-		return aiMatrix4x4(m[0][0], m[0][1], m[0][2], m[0][3],
-						   m[1][0], m[1][1], m[1][2], m[1][3],
-						   m[2][0], m[2][1], m[2][2], m[2][3],
-						   m[3][0], m[3][1], m[3][2], m[3][3]);
+		return aiMatrix4x4(m[0][0], m[1][0], m[2][0], m[3][0],
+						   m[0][1], m[1][1], m[2][1], m[3][1],
+						   m[0][2], m[1][2], m[2][2], m[3][2],
+						   m[0][3], m[1][3], m[2][3], m[3][3]);
 	}
 
 	//display a given matrix
@@ -101,42 +101,12 @@ namespace
 		cout << "-------------------------" << endl;
 	}
 
-	mat4 MultiplyMatrix(aiMatrix4x4& m, float k)
+	mat4 LookAt(vec3& eye, vec3& center, vec3& up)
 	{
-		mat4 ret;
-		for (uint i = 0; i < 4; ++i)
-		{
-			for (uint j = 0; j < 4; ++j)
-			{
-				ret[i][j] = k * m[i][j];
-			}
-		}
+		glm::vec3 gEye(eye.x, eye.y, eye.z);
+		glm::vec3 gCenter(center.x, center.y, center.z);
+		glm::vec3 gUp(up.x, up.y, up.z);
 
-		return ret;
-	}
-
-	void SetMatrixZero(aiMatrix4x4& inOutMatrix)
-	{
-		for (uint i = 0; i < 4; ++i)
-		{
-			for (uint j = 0; j < 4; ++j)
-			{
-				inOutMatrix[i][j] = 0.0f;
-			}
-		}
-	}
-
-	mat4 AddTowMatrices(aiMatrix4x4& m1, aiMatrix4x4& m2)
-	{
-		mat4 ret;
-		for (uint i = 0; i < 4; ++i)
-		{
-			for (uint j = 0; j < 4; ++j)
-			{
-				ret[i][j] = m1[i][j] + m2[i][j];
-			}
-		}
-
-		return ret;
+		return toAssimpMatrix4x4(glm::lookAt(gEye, gCenter, gUp));
 	}
 }
