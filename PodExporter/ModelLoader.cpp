@@ -708,8 +708,12 @@ void ModelLoader::extractEmbeddedTextures()
 			}
 			else
 			{
-				// use free image to create an image
-				cout << "uncompressed embedded texture out put not implemented yet.";
+				// Assimp: The format of the texture data is always ARGB8888
+				// TODO: create a pvr texture
+				//using namespace pvrtexture;
+				//CPVRTextureHeader cHeader(ePVRTPF_PVRTCI_4bpp_RGBA, tex->mHeight, tex->mWidth);
+				//CPVRTexture cTexture(cHeader, tex->pcData);
+				//cTexture.saveFile("out.pvr");
 			}
 		}
 	}
